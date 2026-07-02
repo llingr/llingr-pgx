@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Both modules (root library and tests/) declare go 1.25.0 with no toolchain
+  # bump, so a single version covers every job. govulncheck needs Go >= 1.25.
+  GO_VERSION: '1.25'
+
+jobs:
+  build:
+    name: build & vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+
+  test:
+    name: test (race + coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Library unit tests only: no Docker, fast. The Docker-backed migration test
+      # lives in the tests/ module and runs in the integration job below.
+      - name: Tests
+        run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -5
+      # Skipped under nektos/act (which sets env.ACT=true): Codecov needs a real
+      # GitHub OIDC token / CODECOV_TOKEN that only exists on GitHub-hosted runners.
+      # Runs normally in GitHub Actions.
+      - uses: codecov/codecov-action@v5
+        if: ${{ !env.ACT }}
+        with:
+          files: coverage.out
+          flags: unit
+          fail_ci_if_error: false
+
+  integration:
+    name: integration (testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          # The integration harness is a separate module, so testcontainers never
+          # reaches the library's go.mod; cache off its own go.sum.
+          cache-dependency-path: tests/go.sum
+      # ubuntu-latest ships a running Docker daemon. testcontainers builds
+      # tests/docker/Dockerfile (postgres:16-alpine + provisioned role users) and
+      # runs the migration end to end; the build can be slow on a cold cache.
+      #
+      # -coverpkg points at the library so this cross-module test records coverage
+      # of the library packages it drives. tests/ is a separate module, so the unit
+      # `test` job (go test ./... at the root) never runs these and never reaches
+      # schema/migrate.go's full Up path, which needs a real Postgres. The profile is
+      # uploaded as a second file; Codecov merges it with the unit profile by path.
+      - name: Run integration tests
+        working-directory: tests
+        run: go test -race -timeout 10m -coverpkg=github.com/llingr/llingr-pgx/... -coverprofile=coverage-integration.out ./...
+      - name: Coverage summary
+        working-directory: tests
+        run: go tool cover -func=coverage-integration.out | tail -5
+      - uses: codecov/codecov-action@v5
+        if: ${{ !env.ACT }}
+        with:
+          files: tests/coverage-integration.out
+          flags: integration
+          fail_ci_if_error: false
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+
+  vulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      # Library only: the tests/ module deliberately carries the CVE-prone testcontainers
+      # dependencies not used in the actual library code so it is not scanned.
+      - run: govulncheck ./...

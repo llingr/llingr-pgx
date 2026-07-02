@@ -1,0 +1,17 @@
+version: "2"
+
+# The CI lint job pins golangci-lint v2.12.2 (see .github/workflows/ci.yml).
+# The v2 "standard" default set (errcheck, govet, ineffassign, staticcheck,
+# unused) stays enabled; the additions below are low-noise and catch real
+# mistakes. Formatting is enforced too, so `gofmt -l` drift fails the lint job.
+
+formatters:
+  enable:
+    - gofmt
+
+linters:
+  enable:
+    - copyloopvar # loop-variable copies that Go 1.22+ made unnecessary
+    - misspell    # spelling in comments and strings
+    - nolintlint  # malformed or unexplained //nolint directives
+    - unconvert   # redundant type conversions
