@@ -59,22 +59,22 @@ func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
 			testUsername[role], testPassword, host, port, testDatabase)
 	}
 	roleUsernames := roles.NewPlaceholderBuilder().
-		WithAdminOwner(testUsername[roles.AdminOwnerRole]).
+		WithOwner(testUsername[roles.OwnerRole]).
 		WithApp(testUsername[roles.AppRole]).
 		WithCustom(readOnlyRole, testUsername[readOnlyRole]).
 		MustBuild()
 
-	// Migrate as the admin role (the only one allowed DDL), then drop that pool so
+	// Migrate as the owner role (the only one allowed DDL), then drop that pool so
 	// the rest of the test runs as the lesser app role.
-	adminPool, err := connect.Connect(ctx, urlForRole(roles.AdminOwnerRole))
+	ownerPool, err := connect.Connect(ctx, urlForRole(roles.OwnerRole))
 	if err != nil {
-		t.Fatalf("admin pool: %v", err)
+		t.Fatalf("owner pool: %v", err)
 	}
-	if err := schema.Migrate(ctx, adminPool, migrations.FS, roleUsernames); err != nil {
-		adminPool.Close()
+	if err := schema.Migrate(ctx, ownerPool, migrations.FS, roleUsernames); err != nil {
+		ownerPool.Close()
 		t.Fatalf("migrate: %v", err)
 	}
-	adminPool.Close()
+	ownerPool.Close()
 
 	app, err := connect.Connect(ctx, urlForRole(roles.AppRole))
 	if err != nil {

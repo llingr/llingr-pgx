@@ -190,10 +190,10 @@ func TestTemplatingFS_OpenReadErrorPropagates(t *testing.T) {
 // rolePlaceholderUsernames keys the map by each placeholder's string value.
 func TestRolePlaceholderUsernames_MapsByStringValue(t *testing.T) {
 	got := rolePlaceholderUsernames(map[roles.Placeholder]roles.Username{
-		roles.AdminOwnerRole: "owner",
-		roles.AppRole:        "app_rw",
+		roles.OwnerRole: "example_owner",
+		roles.AppRole:   "example_app_rw",
 	})
-	if got["admin_owner"] != "owner" || got["app"] != "app_rw" {
+	if got["owner"] != "example_owner" || got["app"] != "example_app_rw" {
 		t.Fatalf("unexpected mapping: %+v", got)
 	}
 }

@@ -8,19 +8,19 @@ import (
 
 // readOnlyRole is an application-defined custom role used across these tests,
 // mirroring the :"readonly" placeholder the migrations reference. The library
-// ships only AdminOwnerRole and AppRole as built-ins; everything else (such as
+// ships only OwnerRole and AppRole as built-ins; everything else (such as
 // read-only) is supplied by the application via WithCustom.
 const readOnlyRole roles.Placeholder = "readonly"
 
-// The builder requires at least one role and mandates no specific one: admin_owner,
+// The builder requires at least one role and mandates no specific one: owner,
 // app, or a custom role each suffice on their own. An empty builder is the only
 // hard error, since an empty placeholder->username map is pointless.
 func TestBuilder_RequiresAtLeastOneRole(t *testing.T) {
 	if _, err := roles.NewPlaceholderBuilder().Build(); err == nil {
 		t.Fatal("empty builder should error")
 	}
-	if _, err := roles.NewPlaceholderBuilder().WithAdminOwner("ecommerce_admin_user").Build(); err != nil {
-		t.Errorf("admin_owner-only should build: %v", err)
+	if _, err := roles.NewPlaceholderBuilder().WithOwner("ecommerce_schema_owner").Build(); err != nil {
+		t.Errorf("owner-only should build: %v", err)
 	}
 	if _, err := roles.NewPlaceholderBuilder().WithApp("ecommerce_app_user").Build(); err != nil {
 		t.Errorf("app-only should build: %v", err)
@@ -30,20 +30,20 @@ func TestBuilder_RequiresAtLeastOneRole(t *testing.T) {
 	}
 }
 
-// admin_owner (built-in), app (built-in) and a custom read-only role: the
+// owner (built-in), app (built-in) and a custom read-only role: the
 // canonical setup the migrations expect (:"app" and :"readonly"). Confirms each
 // wrapper maps to the right placeholder key and value, and nothing extra is added.
 func TestBuilder_WrappersMapToPlaceholders(t *testing.T) {
 	got := roles.NewPlaceholderBuilder().
-		WithAdminOwner("ecommerce_admin_user").
+		WithOwner("ecommerce_owner").
 		WithApp("ecommerce_app_user").
 		WithCustom(readOnlyRole, "ecommerce_readonly_user").
 		MustBuild()
 
 	want := map[roles.Placeholder]roles.Username{
-		roles.AdminOwnerRole: "ecommerce_admin_user",
-		roles.AppRole:        "ecommerce_app_user",
-		readOnlyRole:         "ecommerce_readonly_user",
+		roles.OwnerRole: "ecommerce_owner",
+		roles.AppRole:   "ecommerce_app_user",
+		readOnlyRole:    "ecommerce_readonly_user",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("len = %d, want %d (%+v)", len(got), len(want), got)

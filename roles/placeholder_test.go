@@ -7,15 +7,15 @@ import (
 )
 
 func TestPlaceholder_String(t *testing.T) {
-	if roles.AdminOwnerRole.String() != "admin_owner" {
-		t.Fatalf("String() = %q, want admin_owner", roles.AdminOwnerRole.String())
+	if roles.OwnerRole.String() != "owner" {
+		t.Fatalf("String() = %q, want owner", roles.OwnerRole.String())
 	}
 }
 
 // Validate enforces the plain-SQL-identifier rule (the injection mitigation).
 func TestPlaceholder_Validate(t *testing.T) {
 	valid := []roles.Placeholder{
-		roles.AdminOwnerRole, roles.AppRole, "readonly", "_x", "a1", "Reporting_2",
+		roles.OwnerRole, roles.AppRole, "readonly", "_x", "a1", "Reporting_2",
 	}
 	for _, p := range valid {
 		if err := p.Validate(); err != nil {

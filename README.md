@@ -15,7 +15,7 @@ connection-string builder, and ORM-free SQL helpers:
  * Embedded schema migrations using [golang-migrate](https://github.com/golang-migrate/migrate)
    which allows full control of transaction boundaries - easily `CREATE INDEX CONCURRENTLY`.
  * Migration file templating using the quoted-identifier form of psql variable interpolation:
-   injection-safe runtime (per-environment) `GRANT SELECT ON orders TO :"finance_readonly_users";`
+   injection-safe runtime (per-environment) `GRANT SELECT ON orders TO :"readonly";`
  * Roles builder to map the above interpolation placeholders to real usernames.
  * SQL fragments package for ORM-free SQL statements; [scany](https://github.com/georgysavva/scany)
    is recommended for binding structs (not bundled with this library).  
@@ -41,22 +41,22 @@ var migrationsFS embed.FS
 ctx := context.Background()
 
 roleUsernames := roles.NewPlaceholderBuilder().
-    WithAdminOwner("app_owner"). // see 'Roles and Placeholders' below
-    WithApp("app_readwrite").
+    WithOwner("example_schema_owner"). // see 'Roles and Placeholders' below
+    WithApp("example_app_readwrite").
     MustBuild()
 
-adminPool, err := connect.NewConnectionBuilder().
+ownerPool, err := connect.NewConnectionBuilder().
     WithHost("db.example.com").WithPort(5432).
     WithDatabase("appdb").WithSSLMode("require").
-    WithUser(roleUsernames.AdminOwnerUsername()).
+    WithUser(roleUsernames.OwnerUsername()).
     WithPassword(ownerPassword).
     Connect(ctx)
 if err != nil {
     log.Fatal(err)
 }
-defer adminPool.Close()
+defer ownerPool.Close()
 
-if err := schema.Migrate(ctx, adminPool, migrationsFS, roleUsernames); err != nil {
+if err := schema.Migrate(ctx, ownerPool, migrationsFS, roleUsernames); err != nil {
     log.Fatal(err)
 }
 ```
@@ -68,23 +68,25 @@ username in each environment. Placeholders are substituted during deployments.
 
 Two built-in placeholders are provided, and custom placeholders can be added:
 
- * `AdminOwnerRole` (`admin_owner`), owns the schema and runs migrations but is not meant
+ * `OwnerRole` (`owner`), owns the schema and runs migrations, but is not meant
    for runtime queries
  * `AppRole` (`app`), the read/write application user. Should not have schema-altering rights
    so that an injection bug cannot drop a table.
  * `WithCustom` supports further roles as needed.
 
 ```go
+const ReadOnlyRole roles.Placeholder = "readonly"
+
 roleUsernames := roles.NewPlaceholderBuilder().
-    WithAdminOwner("app_owner").                               // -> :"admin_owner"
-    WithApp("app_readwrite").                                  // -> :"app"
-    WithCustom(roles.Placeholder("readonly"), "ops_readonly"). // -> :"readonly"
+    WithOwner("example_schema_owner").            // -> :"owner"     built-in
+    WithApp("example_app_readwrite").             // -> :"app"       built-in
+    WithCustom(ReadOnlyRole, "example_readonly"). // -> :"readonly"  custom
     MustBuild()
 ```
 
 `Build()` returns a `(roles.PlaceholderUsernames, error)` pair, while `MustBuild()` panics
 on error. The result is what `schema.Migrate` takes, and carries accessors such as
-`AdminOwnerUsername()` for wiring connection pools (see the quick start).
+`OwnerUsername()` for wiring connection pools (see the quick start).
 
 Placeholder injection is prevented by requiring plain SQL identifiers: `^[A-Za-z_][A-Za-z0-9_]*$`
 (SQL identifiers can't start with a digit, max 63 characters).
@@ -115,18 +117,18 @@ var migrationsFS embed.FS
 ctx := context.Background()
 
 usernames := roles.NewPlaceholderBuilder().
-    WithAdminOwner("prod_eu_ecomm_owner"). // -> :"admin_owner" owns the schema and runs DDL
-    WithApp("prod_eu_ecomm_app").          // -> :"app" in the migration files
+    WithOwner("prod_eu_ecomm_owner"). // -> :"owner" for running DDL, rarely used in SQL templates
+    WithApp("prod_eu_ecomm_app").     // -> :"app" in the migration files
     MustBuild()
 
-// Use DB owner DDL role for schema migrations. EXAMPLE ONLY: do *NOT* embed secrets in code!
-adminPool, err := connect.Connect(ctx, "postgres://prod_eu_ecomm_owner:secret@prod-eu.example:5432/ecomm")
+// Use schema owner DDL role for schema migrations. EXAMPLE ONLY: do *NOT* embed secrets in code!
+ownerPool, err := connect.Connect(ctx, "postgres://prod_eu_ecomm_owner:secret@prod-eu.example:5432/ecomm")
 if err != nil {
     log.Fatal(err)
 }
-defer adminPool.Close()
+defer ownerPool.Close()
 
-err = schema.Migrate(ctx, adminPool, migrationsFS, usernames)
+err = schema.Migrate(ctx, ownerPool, migrationsFS, usernames)
 if err != nil {
     log.Fatal(err)
 }
@@ -312,7 +314,7 @@ A representative Neon setup migrates on the direct endpoint and serves on the po
 
 ```go
 // Migrations: direct endpoint (no -pooler), as the owner role.
-adminPool, err := connect.NewConnectionBuilder().
+ownerPool, err := connect.NewConnectionBuilder().
     WithHost("ep-cool-darkness-123456.us-east-2.aws.neon.tech").
     WithUser("app_owner").WithPassword(neonOwnerPassword).WithDatabase("appdb").
     WithSSLMode("require").WithChannelBinding("require").

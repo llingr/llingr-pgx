@@ -26,14 +26,14 @@ const (
 // testUsername maps each library role to the user the dev Dockerfile pre-creates,
 // proving the provisioned users line up with the code's Placeholder values.
 // readOnlyRole is an application-defined custom role (the library ships only
-// AdminOwnerRole and AppRole as built-ins); its placeholder matches the
+// OwnerRole and AppRole as built-ins); its placeholder matches the
 // migrations' :"readonly".
 const readOnlyRole roles.Placeholder = "readonly"
 
 var testUsername = map[roles.Placeholder]roles.Username{
-	roles.AdminOwnerRole: "ecommerce_admin_user",
-	roles.AppRole:        "ecommerce_app_user",
-	readOnlyRole:         "ecommerce_readonly_user",
+	roles.OwnerRole: "ecommerce_schema_owner",
+	roles.AppRole:   "ecommerce_app_user",
+	readOnlyRole:    "ecommerce_readonly_user",
 }
 
 type customer struct {
@@ -44,7 +44,7 @@ type customer struct {
 }
 
 // TestMigrateAgainstProvisionedPostgres builds the dev Postgres image (which
-// pre-creates the role-aligned users), then proves: migrations apply as the admin
+// pre-creates the role-aligned users), then proves: migrations apply as the owner
 // role from the embedded FS, the read-write user can write and be read back via
 // scany, and per-table grants hold (app may UPDATE orders but not DELETE them;
 // read-only may read but not write). Queries use pgx named parameters in snake_case
@@ -64,27 +64,27 @@ func TestMigrateAgainstProvisionedPostgres(t *testing.T) {
 	// The placeholder->username map carries the usernames substituted into the
 	// migrations' :"name" placeholders. They must match the users the dev image provisions.
 	roleUsernames := roles.NewPlaceholderBuilder().
-		WithAdminOwner(testUsername[roles.AdminOwnerRole]).
+		WithOwner(testUsername[roles.OwnerRole]).
 		WithApp(testUsername[roles.AppRole]).
 		WithCustom(readOnlyRole, testUsername[readOnlyRole]).
 		MustBuild()
 
-	// Migrate as the admin role (the only one allowed to run DDL): inject a pool
-	// authenticated as AdminOwner, closed at test end so only the lesser app /
+	// Migrate as the owner role (the only one allowed to run DDL): inject a pool
+	// authenticated as Owner, closed at test end so only the lesser app /
 	// read-only roles remain for the assertions below. Three migrations: customers,
 	// currency, customer_orders.
-	adminPool, err := connect.Connect(ctx, urlForRole(roles.AdminOwnerRole))
+	ownerPool, err := connect.Connect(ctx, urlForRole(roles.OwnerRole))
 	if err != nil {
-		t.Fatalf("admin pool: %v", err)
+		t.Fatalf("owner pool: %v", err)
 	}
-	defer adminPool.Close()
+	defer ownerPool.Close()
 
-	if err := schema.Migrate(ctx, adminPool, migrations.FS, roleUsernames); err != nil {
+	if err := schema.Migrate(ctx, ownerPool, migrations.FS, roleUsernames); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
 	// Re-running is a no-op (idempotent).
-	if err := schema.Migrate(ctx, adminPool, migrations.FS, roleUsernames); err != nil {
+	if err := schema.Migrate(ctx, ownerPool, migrations.FS, roleUsernames); err != nil {
 		t.Fatalf("re-migrate: %v", err)
 	}
 
@@ -187,19 +187,19 @@ func TestMigrate_FailingMigrationReportsDirtyVersion(t *testing.T) {
 	ctx := context.Background()
 	host, port := startProvisionedPostgres(t)
 
-	// Admin is the only role allowed to run DDL; the broken migration has no
-	// :"name" placeholders, so an admin-only map suffices.
+	// Owner is the only role allowed to run DDL; the broken migration has no
+	// :"name" placeholders, so an owner-only map suffices.
 	roleUsernames := roles.NewPlaceholderBuilder().
-		WithAdminOwner(testUsername[roles.AdminOwnerRole]).
+		WithOwner(testUsername[roles.OwnerRole]).
 		MustBuild()
 
-	adminURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		testUsername[roles.AdminOwnerRole], testPassword, host, port, testDatabase)
-	adminPool, err := connect.Connect(ctx, adminURL)
+	ownerURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		testUsername[roles.OwnerRole], testPassword, host, port, testDatabase)
+	ownerPool, err := connect.Connect(ctx, ownerURL)
 	if err != nil {
-		t.Fatalf("admin pool: %v", err)
+		t.Fatalf("owner pool: %v", err)
 	}
-	defer adminPool.Close()
+	defer ownerPool.Close()
 
 	brokenMigrations := fstest.MapFS{
 		"001_broken.up.sql": &fstest.MapFile{
@@ -207,7 +207,7 @@ func TestMigrate_FailingMigrationReportsDirtyVersion(t *testing.T) {
 		},
 	}
 
-	err = schema.Migrate(ctx, adminPool, brokenMigrations, roleUsernames)
+	err = schema.Migrate(ctx, ownerPool, brokenMigrations, roleUsernames)
 	if err == nil {
 		t.Fatal("expected migrate to fail on the broken migration")
 	}

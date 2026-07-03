@@ -21,8 +21,8 @@ func TestConstantValuesPinnedBySHA256(t *testing.T) {
 		wantHash string
 	}{
 		{
-			roles.AdminOwnerRole.String(),
-			"198486ad584159349b855a001d2436ed9f291badd68ae4b1878db891ed161ce2",
+			roles.OwnerRole.String(),
+			"4c1029697ee358715d3a14a2add817c4b01651440de808371f78165ac90dc581",
 		},
 		{
 			roles.AppRole.String(),
