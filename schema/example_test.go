@@ -21,20 +21,20 @@ func ExampleMigrate() {
 	ctx := context.Background()
 
 	usernames := roles.NewPlaceholderBuilder().
-		WithAdminOwner("app_owner"). // -> :"admin_owner" owns the schema and runs DDL
-		WithApp("app_readwrite").    // -> :"app" in the migration files
+		WithOwner("example_owner").   // -> :"owner" built-in, normally only runs DDL
+		WithApp("example_readwrite"). // -> :"app" in the migration files
 		MustBuild()
 
 	// The owner-role connection string ops handed you. This includes the
 	// password, so it is a credential: never log it. Migrate borrows from the
 	// pool but never closes it.
-	adminPool, err := connect.Connect(ctx, "postgres://app_owner:secret@db.example.com:5432/appdb")
+	ownerPool, err := connect.Connect(ctx, "postgres://example_owner:secret@db.example.com:5432/appdb")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer adminPool.Close()
+	defer ownerPool.Close()
 
-	err = schema.Migrate(ctx, adminPool, migrations.FS, usernames)
+	err = schema.Migrate(ctx, ownerPool, migrations.FS, usernames)
 	if err != nil {
 		log.Fatal(err)
 	}

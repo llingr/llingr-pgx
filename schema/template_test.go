@@ -51,12 +51,12 @@ func TestSubstitutePlaceholders_LeavesCastsAlone(t *testing.T) {
 
 func TestRolePlaceholderUsernames(t *testing.T) {
 	roles := roles2.NewPlaceholderBuilder().
-		WithAdminOwner("ecommerce_admin_user").
+		WithOwner("ecommerce_schema_owner").
 		WithApp("ecommerce_app_user").
 		WithCustom("custom_readonly_user", "ecommerce_readonly_user").
 		MustBuild()
 
-	if roles["admin_owner"] != "ecommerce_admin_user" {
+	if roles["owner"] != "ecommerce_schema_owner" {
 		t.Fatalf("unexpected placeholder usernames: %+v", roles)
 	}
 

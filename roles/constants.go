@@ -4,8 +4,8 @@ import "regexp"
 
 // common roles
 const (
-	AdminOwnerRole Placeholder = "admin_owner" // for startup/migrations DDL, NOT for runtime Data Manipulation
-	AppRole        Placeholder = "app"         // typical runtime DML user, NOT for startup Data Definition
+	OwnerRole Placeholder = "owner" // for startup/migrations DDL, NOT for runtime Data Manipulation
+	AppRole   Placeholder = "app"   // typical runtime DML user, NOT for startup Data Definition
 )
 
 // PlainSQLIdentifierRegex mitigates placeholder injection

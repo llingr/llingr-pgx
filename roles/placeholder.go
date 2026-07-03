@@ -5,7 +5,7 @@ import (
 )
 
 // Placeholder names a role as referenced in migration files. Built-in:
-//   - AdminOwnerRole for migrations/DDL
+//   - OwnerRole for migrations/DDL
 //   - AppRole for application access
 //
 // Additional custom roles can be added as needed.

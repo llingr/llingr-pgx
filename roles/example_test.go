@@ -12,16 +12,16 @@ import (
 // wiring connection pools.
 func ExampleNewPlaceholderBuilder() {
 	usernames := roles.NewPlaceholderBuilder().
-		WithAdminOwner("ecommerce_admin_user").            // -> :"admin_owner"
-		WithApp("ecommerce_app_user").                     // -> :"app"
-		WithCustom("readonly", "ecommerce_readonly_user"). // -> :"readonly"
+		WithOwner("ecommerce_schema_owner").               // -> :"owner"    built-in
+		WithApp("ecommerce_app_user").                     // -> :"app"      built-in
+		WithCustom("readonly", "ecommerce_readonly_user"). // -> :"readonly" custom
 		MustBuild()
 
-	fmt.Println(usernames.AdminOwnerUsername())
+	fmt.Println(usernames.OwnerUsername())
 	fmt.Println(usernames.AppUsername())
 	fmt.Println(usernames.UsernameFor("readonly"))
 	// Output:
-	// ecommerce_admin_user
+	// ecommerce_schema_owner
 	// ecommerce_app_user
 	// ecommerce_readonly_user
 }

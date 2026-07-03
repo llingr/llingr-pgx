@@ -1,4 +1,4 @@
-// Package roles maps role placeholders in migration files (:"admin_owner",
+// Package roles maps role placeholders in migration files (:"owner",
 // :"app", ...) to the real usernames used in each environment, validating
 // placeholders and usernames are plain SQL identifiers.
 package roles
@@ -22,10 +22,10 @@ func NewPlaceholderBuilder() *Builder {
 	}
 }
 
-// WithAdminOwner for COMPLETE schema access, only to be used
+// WithOwner for COMPLETE schema access, only to be used
 // for DDL database changes (migrations).
-func (b *Builder) WithAdminOwner(username Username) *Builder {
-	return b.WithCustom(AdminOwnerRole, username)
+func (b *Builder) WithOwner(username Username) *Builder {
+	return b.WithCustom(OwnerRole, username)
 }
 
 // WithApp for typical read/write application access WITHOUT

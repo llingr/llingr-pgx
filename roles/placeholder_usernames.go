@@ -4,9 +4,9 @@ package roles
 // the current environment. These are substituted in migrations.
 type PlaceholderUsernames map[Placeholder]Username
 
-// AdminOwnerUsername returns the username bound to AdminOwnerRole, or "" if none was set
-func (p PlaceholderUsernames) AdminOwnerUsername() string {
-	return p.UsernameFor(AdminOwnerRole)
+// OwnerUsername returns the username bound to OwnerRole, or "" if none was set
+func (p PlaceholderUsernames) OwnerUsername() string {
+	return p.UsernameFor(OwnerRole)
 }
 
 // AppUsername returns the username bound to AppRole, or "" if none was set
