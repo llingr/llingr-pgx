@@ -1,3 +1,6 @@
+// Package roles maps role placeholders in migration files (:"admin_owner",
+// :"app", ...) to the real usernames used in each environment, validating
+// placeholders and usernames are plain SQL identifiers.
 package roles
 
 import (
