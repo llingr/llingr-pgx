@@ -63,6 +63,14 @@ func (b *ConnectionBuilder) WithSSLKey(path string) *ConnectionBuilder {
 	return b.WithParam(ParamSSLKey, path)
 }
 
+// WithChannelBinding sets the libpq channel_binding (prefer, disable, require). See
+// ValidChannelBindings. Required by some providers (e.g. Neon's "channel_binding=require").
+// It only takes effect over TLS, so pair "require" with an SSL mode other than disable.
+func (b *ConnectionBuilder) WithChannelBinding(mode string) *ConnectionBuilder {
+	b.channelBinding = mode
+	return b
+}
+
 // WithPgBouncerCompatibility configures pgx to run safely behind a transaction-pooling
 // connection pooler that does NOT support prepared statements: stock PgBouncer in
 // transaction/statement mode, and AWS RDS Proxy (where prepared statements force

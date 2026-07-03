@@ -3,10 +3,11 @@ package roles
 import (
 	"errors"
 	"fmt"
+	"maps"
 )
 
-// Builder builder to introduce placeholder <-> username
-// mappings and confirm usernames are valid/plaintext SQL identifiers
+// Builder creates placeholder <-> username mappings and
+// checks both are plain SQL identifiers.
 type Builder struct {
 	placeholderUsernames PlaceholderUsernames
 }
@@ -43,12 +44,12 @@ func (b *Builder) Build() (PlaceholderUsernames, error) {
 	const noRolesError = "no roles added to %T"
 
 	if len(b.placeholderUsernames) == 0 {
-		return b.placeholderUsernames, fmt.Errorf(noRolesError, b)
+		return nil, fmt.Errorf(noRolesError, b)
 	}
 	if err := ValidatePlaceholderUsernames(b.placeholderUsernames); err != nil {
-		return b.placeholderUsernames, err
+		return nil, err
 	}
-	return b.placeholderUsernames, nil
+	return maps.Clone(b.placeholderUsernames), nil
 }
 
 // ValidatePlaceholderUsernames reports whether every placeholder and its mapped
@@ -80,9 +81,9 @@ func ValidatePlaceholderUsernames(placeholderUsernames PlaceholderUsernames) err
 
 // MustBuild for fail-fast wiring at startup
 func (b *Builder) MustBuild() PlaceholderUsernames {
-	_, err := b.Build()
+	placeholderUsernames, err := b.Build()
 	if err != nil {
 		panic(fmt.Sprintf("roles: invalid role set: %v", err))
 	}
-	return b.placeholderUsernames
+	return placeholderUsernames
 }

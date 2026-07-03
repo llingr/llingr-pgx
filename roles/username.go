@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// Username often different usernames for
-// the same roles in different environments
+// Username is a concrete database username; the same role
+// often has a different username in each environment.
 type Username string
 
 func (u Username) String() string {

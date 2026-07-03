@@ -41,7 +41,7 @@ var migrationsFS embed.FS
 ctx := context.Background()
 
 roleUsernames := roles.NewPlaceholderBuilder().
-    WithAdminOwner("admin_owner"). // see 'Roles and Placeholders' below
+    WithAdminOwner("app_owner"). // see 'Roles and Placeholders' below
     WithApp("app_readwrite").
     MustBuild()
 
@@ -76,7 +76,7 @@ Two built-in placeholders are provided, and custom placeholders can be added:
 
 ```go
 roleUsernames := roles.NewPlaceholderBuilder().
-    WithAdminOwner("admin_owner").                             // -> :"admin_owner"
+    WithAdminOwner("app_owner").                               // -> :"admin_owner"
     WithApp("app_readwrite").                                  // -> :"app"
     WithCustom(roles.Placeholder("readonly"), "ops_readonly"). // -> :"readonly"
     MustBuild()
@@ -87,7 +87,7 @@ on error. The result is what `schema.Migrate` takes, and carries accessors such 
 `AdminOwnerUsername()` for wiring connection pools (see the quick start).
 
 Placeholder injection is prevented by requiring plain SQL identifiers: `^[A-Za-z_][A-Za-z0-9_]*$`
-(SQL identifiers can't start with a digit).
+(SQL identifiers can't start with a digit, max 63 characters).
 
 
 ## Migrations

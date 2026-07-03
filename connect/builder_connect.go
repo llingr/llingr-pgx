@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,13 +44,21 @@ func (b *ConnectionBuilder) connect(ctx context.Context, connString string) (*pg
 	return ConnectConfig(ctx, config)
 }
 
-// validate SSL mode, channel binding, and WithParam/dedicated-setter collisions
+// validate SSL mode, channel binding, WithParam keys, and WithParam/dedicated-setter collisions
 func (b *ConnectionBuilder) validate() error {
+	const paramKeyRegex = `^[a-z_][a-z0-9_]*$`
+
 	if b.sslmode != "" && !slices.Contains(ValidSSLModes, b.sslmode) {
 		return fmt.Errorf("invalid sslMode: %s", b.sslmode)
 	}
 	if b.channelBinding != "" && !slices.Contains(ValidChannelBindings, b.channelBinding) {
 		return fmt.Errorf("invalid channelBinding: %s", b.channelBinding)
+	}
+	paramKey := regexp.MustCompile(paramKeyRegex)
+	for _, key := range b.paramKeys {
+		if !paramKey.MatchString(key) {
+			return fmt.Errorf("invalid parameter name: %q", key)
+		}
 	}
 	return b.validateNoParamCollisions()
 }

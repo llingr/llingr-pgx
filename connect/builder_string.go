@@ -41,11 +41,14 @@ func (b *ConnectionBuilder) PSQL() string {
 		}
 	}
 
-	// A unix-socket host is an absolute path, which is not a valid URL authority.
-	// libpq carries it in the host query parameter instead, leaving the authority
-	// empty (postgres://user@/dbname?host=/var/run/postgresql).
-	socket := strings.HasPrefix(b.host, "/")
-	if !socket {
+	// A unix-socket host is an absolute path, which is not a valid URL.
+	// libpq expects it in the host query parameter instead, leaving the authority
+	// empty (postgres://user@/dbname?host=/var/run/postgresql). A zoned IPv6 host
+	// (fe80::1%eth0) with no port also goes in the query parameter: pgx cannot
+	// parse the bracketed form without a port.
+	hostInQuery := strings.HasPrefix(b.host, "/") ||
+		(b.port == 0 && strings.Contains(b.host, "%"))
+	if !hostInQuery {
 		switch {
 		case b.host != "" && b.port != 0:
 			uri.Host = net.JoinHostPort(b.host, strconv.FormatUint(uint64(b.port), 10))
@@ -82,7 +85,7 @@ func (b *ConnectionBuilder) PSQL() string {
 				continue
 			}
 		case ParamHost, ParamPort:
-			if !socket {
+			if !hostInQuery {
 				continue
 			}
 		}

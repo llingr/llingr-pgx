@@ -94,14 +94,6 @@ func (b *ConnectionBuilder) WithSSLMode(mode string) *ConnectionBuilder {
 	return b
 }
 
-// WithChannelBinding sets the libpq channel_binding (prefer, disable, require). See
-// ValidChannelBindings. Required by some providers (e.g. Neon's "channel_binding=require").
-// It only takes effect over TLS, so pair "require" with an SSL mode other than disable.
-func (b *ConnectionBuilder) WithChannelBinding(mode string) *ConnectionBuilder {
-	b.channelBinding = mode
-	return b
-}
-
 // WithParam sets any other libpq keyword (e.g. "connect_timeout", "application_name",
 // "sslrootcert"), for parameters without a dedicated setter. Using it to duplicate a
 // dedicated setter that is also in use fails validation at Connect time, since the
