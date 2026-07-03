@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Placeholder can be provided built-in personas:
+// Placeholder names a role as referenced in migration files. Built-in:
 //   - AdminOwnerRole for migrations/DDL
 //   - AppRole for application access
 //

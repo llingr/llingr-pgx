@@ -68,6 +68,35 @@ func TestPSQL_IPv6HostIsBracketed(t *testing.T) {
 	}
 }
 
+// A zoned IPv6 host (fe80::1%eth0) with no port is rendered as a host query
+// parameter (like a socket path), because the bracketed form does not parse
+// without a port. With a port it stays in the authority. Both parse back to
+// the zoned address.
+func TestPSQL_ZonedIPv6Host(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		b    *ConnectionBuilder
+		want string
+	}{
+		{"without port", NewConnectionBuilder().WithHost("fe80::1%eth0").WithUser("u"), "?host="},
+		{"with port", NewConnectionBuilder().WithHost("fe80::1%eth0").WithPort(5432).WithUser("u"), "[fe80::1%25eth0]:5432"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			uri := tc.b.PSQL()
+			if !strings.Contains(uri, tc.want) {
+				t.Fatalf("expected %q in %s", tc.want, uri)
+			}
+			config, err := pgxpool.ParseConfig(uri)
+			if err != nil {
+				t.Fatalf("ParseConfig(%s): %v", uri, err)
+			}
+			if config.ConnConfig.Host != "fe80::1%eth0" {
+				t.Errorf("host = %q, want fe80::1%%eth0", config.ConnConfig.Host)
+			}
+		})
+	}
+}
+
 // A WithParam key that duplicates a dedicated setter in use fails validation:
 // duplicate keywords are resolved last-wins by the DSN parser but first-wins by
 // the URL parser, so the two renderings of one builder would disagree.
@@ -92,6 +121,20 @@ func TestValidate_ParamCollisionWithDedicatedSetter(t *testing.T) {
 	}
 	if err := NewConnectionBuilder().WithHost("h").WithParam(ParamApplicationName, "svc").validate(); err != nil {
 		t.Errorf("non-colliding param should validate: %v", err)
+	}
+}
+
+// A WithParam key that is not a plain lowercase libpq keyword fails validation:
+// whitespace or '=' in a key renders differently in the DSN and URL forms.
+func TestValidate_ParamKey(t *testing.T) {
+	for _, key := range []string{"", "my key", "a=b", "Upper", "tab\tkey"} {
+		b := NewConnectionBuilder().WithParam(key, "v")
+		if err := b.validate(); err == nil || !strings.Contains(err.Error(), "invalid parameter name") {
+			t.Errorf("key %q should fail validation, got %v", key, err)
+		}
+	}
+	if err := NewConnectionBuilder().WithParam("connect_timeout", "5").validate(); err != nil {
+		t.Errorf("valid key should pass: %v", err)
 	}
 }
 
