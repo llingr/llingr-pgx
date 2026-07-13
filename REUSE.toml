@@ -1,0 +1,32 @@
+version = 1
+
+# Bulk annotation for files that cannot or should not carry in-file SPDX
+# headers (structured configs, prose, attribution files, test fixtures).
+# precedence = "closest" keeps any in-file header authoritative.
+[[annotations]]
+path = [
+    ".fossa.yml",
+    ".github/**",
+    ".gitignore",
+    ".golangci.yml",
+    "AUTHORS",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "COPYRIGHT",
+    "Makefile",
+    "NOTICE",
+    "README.md",
+    "SECURITY.md",
+    "go.mod",
+    "go.sum",
+    "tests/go.mod",
+    "tests/go.sum",
+    "lexicon/testdata/**",
+    "schema/testdata/**",
+    "tests/testdata/**",
+    "tests/queries/**",
+    "tests/docker/**",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "Copyright (c) 2026 The llingr-pgx Authors"
+SPDX-License-Identifier = "Apache-2.0"

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package lexicon loads named SQL fragments from plain .sql files held in an
 // embedded (or any other) fs.FS and returns them by name. There is no ORM and
 // no query builder: you write ordinary SQL as text, mark each statement with a

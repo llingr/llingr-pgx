@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package connect opens pgx connection pools to Postgres, each verified with a ping
 // so a bad address or unreachable server fails at connect time rather than on first
 // query.

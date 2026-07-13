@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package schema applies ordered SQL migrations from an embedded filesystem
 // (golang-migrate using pgx/v5 driver), substituting role-username placeholders
 // into each file just before it runs.
