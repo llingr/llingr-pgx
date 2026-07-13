@@ -1,6 +1,9 @@
 # llingr-pgx
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/llingr/llingr-pgx.svg)](https://pkg.go.dev/github.com/llingr/llingr-pgx)
+[![CI](https://github.com/llingr/llingr-pgx/actions/workflows/ci.yml/badge.svg)](https://github.com/llingr/llingr-pgx/actions/workflows/ci.yml)
+[![Lint](https://github.com/llingr/llingr-pgx/actions/workflows/lint.yml/badge.svg)](https://github.com/llingr/llingr-pgx/actions/workflows/lint.yml)
+[![Integration](https://github.com/llingr/llingr-pgx/actions/workflows/integration.yml/badge.svg)](https://github.com/llingr/llingr-pgx/actions/workflows/integration.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/llingr/llingr-pgx)](go.mod)
 [![Tag](https://img.shields.io/github/v/tag/llingr/llingr-pgx)](https://github.com/llingr/llingr-pgx/tags)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
