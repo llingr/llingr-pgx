@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package migrations embeds the SQL migration files so the directory is a
 // self-contained unit: the embed.FS lives alongside the *.sql it carries, rooted
 // at this directory. Run them with schema.Migrate(ctx, pool, migrations.FS, roles)

@@ -1,0 +1,8 @@
+version: 3
+project:
+  name: llingr-pgx
+
+# First-party license scanning is enabled in FOSSA project/org settings, not
+# in this file. Apache-2.0 is detected natively, so no customLicenseSearch
+# entries are needed; every file is covered by an in-file SPDX header or the
+# REUSE.toml bulk annotation.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package roles maps role placeholders in migration files (:"owner",
 // :"app", ...) to the real usernames used in each environment, validating
 // placeholders and usernames are plain SQL identifiers.

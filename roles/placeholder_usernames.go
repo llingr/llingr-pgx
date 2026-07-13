@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package roles
 
 // PlaceholderUsernames maps each role placeholder to the username bound to it for
