@@ -1,0 +1,53 @@
+name: Integration
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Both modules (root library and tests/) declare go 1.25.0 with no toolchain
+  # bump, so a single version covers every job.
+  GO_VERSION: '1.25'
+
+jobs:
+  integration:
+    name: integration (testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          # The integration harness is a separate module, so testcontainers never
+          # reaches the library's go.mod; cache off its own go.sum.
+          cache-dependency-path: tests/go.sum
+      # ubuntu-latest ships a running Docker daemon. testcontainers builds
+      # tests/docker/Dockerfile (postgres:16-alpine + provisioned role users) and
+      # runs the migration end to end; the build can be slow on a cold cache.
+      #
+      # -coverpkg points at the library so this cross-module test records coverage
+      # of the library packages it drives. tests/ is a separate module, so the unit
+      # `test` job (go test ./... at the root) never runs these and never reaches
+      # schema/migrate.go's full Up path, which needs a real Postgres. The profile is
+      # uploaded as a second file; Codecov merges it with the unit profile by path.
+      - name: Run integration tests
+        working-directory: tests
+        run: go test -race -timeout 10m -coverpkg=github.com/llingr/llingr-pgx/... -coverprofile=coverage-integration.out ./...
+      - name: Coverage summary
+        working-directory: tests
+        run: go tool cover -func=coverage-integration.out | tail -5
+      - uses: codecov/codecov-action@v7
+        if: ${{ !env.ACT }}
+        with:
+          files: tests/coverage-integration.out
+          flags: integration
+          fail_ci_if_error: false
