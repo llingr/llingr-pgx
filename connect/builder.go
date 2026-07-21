@@ -121,12 +121,12 @@ func (b *ConnectionBuilder) WithMinConns(minConns int32) *ConnectionBuilder {
 	return b
 }
 
-// WithMinIdleConns sets the minimum number of idle connections the pool keeps ready
+// WithMinIdleConns sets the minimum number of idle connections the pool keeps active
 // (pgx pool_min_idle_conns), so bursts find warm connections without paying connect
 // latency. Distinct from WithMinConns, which is a floor on total connections; the pool
 // maintains max(minConns, minIdleConns) idle resources. Leave it at 0 for scale-to-zero
-// deployments, since a non-zero value keeps reopening connections and waking a
-// suspended compute, exactly like a non-zero MinConns.
+// deployments, since a non-zero value keeps reopening connections and waking
+// suspended compute (same as non-zero MinConns).
 func (b *ConnectionBuilder) WithMinIdleConns(minIdleConns int32) *ConnectionBuilder {
 	b.minIdleConns = minIdleConns
 	return b

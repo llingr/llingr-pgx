@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package roles maps role placeholders in migration files (:"owner",
+// Package roles, maps role placeholders in migration files (:"owner",
 // :"app", ...) to the real usernames used in each environment, validating
 // placeholders and usernames are plain SQL identifiers.
 package roles
@@ -44,8 +44,8 @@ func (b *Builder) WithCustom(role Placeholder, username Username) *Builder {
 	return b
 }
 
-// Build validates and returns placeholder/username map, failing
-// if any username is not a plaintext SQL identifier
+// Build validates and returns a placeholder/username map,
+// failing if any username is not a plaintext SQL identifier
 func (b *Builder) Build() (PlaceholderUsernames, error) {
 	const noRolesError = "no roles added to %T"
 
@@ -59,11 +59,11 @@ func (b *Builder) Build() (PlaceholderUsernames, error) {
 }
 
 // ValidatePlaceholderUsernames reports whether every placeholder and its mapped
-// username is a plain SQL identifier, joining all failures. Unlike Build it does
-// not require the map to be non-empty: a migration set with no :"name" placeholders
-// legitimately needs no roles, and the Builder enforces non-emptiness separately.
-// schema.Migrate calls this so a map assembled by hand (bypassing the Builder, and
-// so its validation) is still checked before any username reaches the SQL.
+// username is a plain SQL identifier. Unlike Build, it does not require the map
+// to be populated.
+//
+// Called by schema.Migrate so a map assembled by hand (bypassing the Builder and
+// its validation) is still checked before any username is applied to migration SQL.
 func ValidatePlaceholderUsernames(placeholderUsernames PlaceholderUsernames) error {
 	const (
 		invalidUsername = "invalid username for role %q: %w"

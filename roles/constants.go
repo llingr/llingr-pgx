@@ -19,12 +19,12 @@ const PlainSQLIdentifierRegex = `^[A-Za-z_][A-Za-z0-9_]*$`
 // truncated name; they are rejected at validation instead.
 const MaxIdentifierBytes = 63
 
-// plainSQLIdentifier is PlainSQLIdentifierRegex compiled once, reused by every check.
+// plainSQLIdentifier is compiled once and reused by every check.
 var plainSQLIdentifier = regexp.MustCompile(PlainSQLIdentifierRegex)
 
-// isPlainSQLIdentifier reports whether s is a plain SQL identifier within
-// Postgres's length limit, mitigating placeholder injection and silent
-// server-side truncation.
+// isPlainSQLIdentifier reports whether s is a plain SQL identifier
+// within Postgres's length limit, mitigating placeholder injection
+// and silent server-side truncation.
 func isPlainSQLIdentifier(s string) bool {
 	if s == "" || len(s) > MaxIdentifierBytes {
 		return false

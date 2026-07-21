@@ -3,8 +3,8 @@
 
 package roles
 
-// PlaceholderUsernames maps each role placeholder to the username bound to it for
-// the current environment. These are substituted in migrations.
+// PlaceholderUsernames maps each role placeholder to the username bound to
+// it for the current environment. These are substituted in migrations.
 type PlaceholderUsernames map[Placeholder]Username
 
 // OwnerUsername returns the username bound to OwnerRole, or "" if none was set
