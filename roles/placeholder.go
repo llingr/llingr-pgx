@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// Placeholder names a role as referenced in migration files. Built-in:
+// Placeholder specifies a role as referenced in migration files. Built-in:
 //   - OwnerRole for migrations/DDL
 //   - AppRole for application access
 //

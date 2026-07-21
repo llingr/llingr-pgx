@@ -12,7 +12,7 @@ import (
 
 // This file holds the connection options beyond the core identity (host, port,
 // credentials, database) and pool sizing in builder.go: observability, HA topology,
-// TLS material, connection-pooler compatibility, and a programmatic escape hatch for
+// TLS material, connection-pooler compatibility, and direct access for
 // bespoke setups (AWS RDS IAM auth, in-memory TLS, tracing, pgx type registration).
 //
 // Everything except WithConfigHook is sugar over WithParam: it renders into the

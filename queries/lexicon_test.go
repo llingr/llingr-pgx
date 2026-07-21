@@ -19,7 +19,7 @@ func file(parts ...string) *fstest.MapFile {
 	return &fstest.MapFile{Data: []byte(strings.Join(parts, ""))}
 }
 
-func mustLoad(t *testing.T, fsys fs.FS) Fragments {
+func mustLoad(t *testing.T, fsys fs.FS) Statements {
 	t.Helper()
 	set, err := Load(fsys)
 	if err != nil {
@@ -28,7 +28,7 @@ func mustLoad(t *testing.T, fsys fs.FS) Fragments {
 	return set
 }
 
-func wantSQL(t *testing.T, set Fragments, name, want string) {
+func wantSQL(t *testing.T, set Statements, name, want string) {
 	t.Helper()
 	if got := set.SQL(name); got != want {
 		t.Errorf("SQL(%q) = %q, want %q", name, got, want)
@@ -52,7 +52,7 @@ func TestLoad_ParsesNamedBlocks(t *testing.T) {
 	})
 
 	if got := len(set.Names()); got != 2 {
-		t.Fatalf("loaded %d fragments, want 2", got)
+		t.Fatalf("loaded %d statements, want 2", got)
 	}
 	// single line
 	wantSQL(t, set, "all-users", "SELECT id, name FROM users;")
@@ -78,7 +78,7 @@ func TestSQL(t *testing.T) {
 	})
 
 	wantSQL(t, set, "ping", "SELECT 1;")
-	// fragments are never empty, so "" unambiguously means "not defined"
+	// statements are never empty, so "" unambiguously means "not defined"
 	wantSQL(t, set, "missing", "")
 }
 
@@ -128,12 +128,12 @@ func TestLoad_NoSQLFilesIsEmptyNotError(t *testing.T) {
 		"dir/x.txt": file("x"),
 	})
 	if got := len(set.Names()); got != 0 {
-		t.Fatalf("loaded %d fragments, want 0", got)
+		t.Fatalf("loaded %d statements, want 0", got)
 	}
 
 	// a completely empty filesystem is also fine
 	if set := mustLoad(t, fstest.MapFS{}); len(set.Names()) != 0 {
-		t.Fatalf("empty FS loaded %d fragments, want 0", len(set.Names()))
+		t.Fatalf("empty FS loaded %d statements, want 0", len(set.Names()))
 	}
 }
 

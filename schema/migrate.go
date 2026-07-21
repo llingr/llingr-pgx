@@ -3,11 +3,11 @@
 
 // Package schema applies ordered SQL migrations from an embedded filesystem
 // (golang-migrate using pgx/v5 driver), substituting role-username placeholders
-// into each file just before it runs.
+// into each file before each migration file is applied.
 //
-// Migrations use the conventional NNN_name.up.sql naming. For Postgres the driver
-// does not wrap a migration in a transaction, so each file must wrap its own change
-// in BEGIN TRANSACTION; ... COMMIT TRANSACTION; for atomicity.
+// Migrations use the conventional NNN_name.up.sql naming. The migrations library
+// does not wrap a migration in a transaction, so each file must wrap changes
+// using BEGIN TRANSACTION; ... COMMIT TRANSACTION; for atomicity.
 //
 // Placeholder substitution is textual: unlike psql's own interpolation, it does not
 // skip string literals or comments, so a literal ':"name"' anywhere in a migration
@@ -35,14 +35,11 @@ import (
 // error names the version the schema stopped (and is left dirty) at, when
 // golang-migrate can report it.
 //
-// pool must authenticate as a role permitted to run DDL; the caller owns it
-// (Migrate never closes it). roleUsernames are substituted for the migrations'
-// :"name" placeholders; an unmatched placeholder is a hard error. By default
-// migrations are read from the root of fsys; override with WithFilesystemDirectory.
+// pool must authenticate as a role permitted to run DDL; the caller assumes this
+// During migration the roleUsernames are substituted for the :"name" placeholders;
+// an unmatched placeholder is a hard error.
 //
-// ctx is honoured only before the run starts: golang-migrate cannot cancel a
-// migration in progress, so cancellation after the run begins does not
-// interrupt it.
+// By default, migrations are read from the root of fsys; override using WithFilesystemDirectory.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames roles.PlaceholderUsernames,
 	options ...Option) (err error) {
 
@@ -79,8 +76,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames 
 	}()
 
 	// Wrap the caller's pgx pool as a database/sql handle for golang-migrate.
-	// OpenDBFromPool does NOT take ownership: closing this sql.DB (which
-	// migrator.Close does) leaves the pool open for the caller to manage.
+	// OpenDBFromPool does NOT take ownership: closing this sql.DB instance
+	// leaves the pool open for the caller to manage.
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	driver, err = migratepgx.WithInstance(sqlDB, &migratepgx.Config{})
 	if err != nil {
@@ -93,7 +90,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames 
 	)
 	migrator, errM := migrate.NewWithInstance(sourceName, migrationSource, databaseDriverName, driver)
 	if errM != nil {
-		_ = driver.Close() // not yet owned by a migrator, close it ourselves (leaves pool open)
+		_ = driver.Close() // not yet owned by a migrator (leaves pool open)
 		return fmt.Errorf("init migrator: %w", errM)
 	}
 	defer func() {
@@ -101,15 +98,15 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames 
 	}()
 
 	if err = migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		// golang-migrate marks a version dirty before running it and clears it only
-		// on success, so a failed run leaves the schema dirty at the migration that
-		// broke: name that version.
+		// golang-migrate marks a version dirty before
+		// running it and clears it only on success
 		if version, dirty, errV := migrator.Version(); errV == nil && dirty {
 			return fmt.Errorf("apply migrations (dirty at version %d): %w", version, err)
 		}
 		return fmt.Errorf("apply migrations: %w", err)
 	}
-	// Up returned nil (changes applied) or ErrNoChange (already current); both are
-	// success, so an idempotent re-run does not surface ErrNoChange to the caller.
+
+	// Up returned nil (changes applied) or ErrNoChange
+	// (already current); both mean success.
 	return nil
 }

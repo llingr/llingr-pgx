@@ -14,7 +14,7 @@ import (
 //go:embed testdata/queries
 var queryFS embed.FS
 
-// Load parses every embedded .sql file into named fragments, validating names
+// Load parses every embedded .sql file into named statements, validating names
 // and bodies once at startup. Execution stays with your driver: pass the
 // returned SQL to pgx, together with pgx.NamedArgs for the @named parameters.
 func ExampleLoad() {
