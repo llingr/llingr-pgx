@@ -1,4 +1,4 @@
--- Ecommerce read/write queries, loaded by the lexicon package.
+-- Ecommerce read/write queries, loaded by the queries package.
 --
 -- House style on display here: every statement uses pgx *named* parameters,
 -- named in snake_case to mirror the column (@customer_id, never positional $1/?

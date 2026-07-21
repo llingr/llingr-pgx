@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package lexicon loads named SQL fragments from plain .sql files held in an
+// Package queries loads named SQL fragments from plain .sql files held in an
 // embedded (or any other) fs.FS and returns them by name. There is no ORM and
 // no query builder: you write ordinary SQL as text, mark each statement with a
 // `-- name: <ident>` comment, and look it up at runtime.
@@ -20,10 +20,10 @@
 //	//go:embed queries/*.sql
 //	var queryFS embed.FS
 //
-//	lex, err := lexicon.Load(queryFS)
+//	q, err := queries.Load(queryFS)
 //	...
-//	rows, err := db.Query(ctx, lex.SQL("user-by-id"), pgx.NamedArgs{"user_id": 42})
-package lexicon
+//	rows, err := db.Query(ctx, q.SQL("user-by-id"), pgx.NamedArgs{"user_id": 42})
+package queries
 
 import (
 	"fmt"
@@ -78,15 +78,15 @@ func Load(fsys fs.FS) (Fragments, error) {
 		}
 		data, err := fs.ReadFile(fsys, path)
 		if err != nil {
-			return fmt.Errorf("lexicon: read %s: %w", path, err)
+			return fmt.Errorf("queries: read %s: %w", path, err)
 		}
 		named, err := parse(string(data))
 		if err != nil {
-			return fmt.Errorf("lexicon: parse %s: %w", path, err)
+			return fmt.Errorf("queries: parse %s: %w", path, err)
 		}
 		for name, sql := range named {
 			if prev, dup := origin[name]; dup {
-				return fmt.Errorf("lexicon: duplicate query %q in %s (already defined in %s)", name, path, prev)
+				return fmt.Errorf("queries: duplicate query %q in %s (already defined in %s)", name, path, prev)
 			}
 			byName[name] = sql
 			origin[name] = path

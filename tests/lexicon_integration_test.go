@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/llingr/llingr-pgx/connect"
-	"github.com/llingr/llingr-pgx/lexicon"
+	"github.com/llingr/llingr-pgx/queries"
 	"github.com/llingr/llingr-pgx/roles"
 	"github.com/llingr/llingr-pgx/schema"
 	"github.com/llingr/llingr-pgx/tests/testdata/migrations"
@@ -37,7 +37,7 @@ type orderJoin struct {
 	OrderStatus   string    `db:"order_status"`
 }
 
-// TestLexicon_InsertAndJoinWithNamedParams drives the lexicon package end to end
+// TestLexicon_InsertAndJoinWithNamedParams drives the queries package end to end
 // against real Postgres. It loads named SQL fragments from embedded .sql files,
 // inserts a customer and an order, then reads them back through an explicit
 // JOIN ... ON. Primary-key UUIDs are generated in Go (google/uuid) and bound as
@@ -51,9 +51,9 @@ func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
 	ctx := context.Background()
 
 	// Load the named SQL fragments once: this is the whole job of the package.
-	queries, err := lexicon.Load(queryFS)
+	q, err := queries.Load(queryFS)
 	if err != nil {
-		t.Fatalf("lexicon.Load: %v", err)
+		t.Fatalf("q.Load: %v", err)
 	}
 
 	host, port := startProvisionedPostgres(t)
@@ -88,7 +88,7 @@ func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
 	// Keys are minted in Go and bound as parameters. No DB-side generator, and no
 	// RETURNING round-trip since we already hold the ids.
 	customerID := uuid.New()
-	if _, err := app.Exec(ctx, queries.SQL("insert-customer"),
+	if _, err := app.Exec(ctx, q.SQL("insert-customer"),
 		pgx.NamedArgs{
 			"customer_id": customerID,
 			"email":       "grace@example.com",
@@ -98,7 +98,7 @@ func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
 	}
 
 	orderID := uuid.New()
-	if _, err := app.Exec(ctx, queries.SQL("insert-order"),
+	if _, err := app.Exec(ctx, q.SQL("insert-order"),
 		pgx.NamedArgs{
 			"customer_order_id":  orderID,
 			"customer_id":        customerID,
@@ -112,7 +112,7 @@ func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
 
 	// Read it back through the explicit join, scanned into a struct by scany.
 	var got orderJoin
-	if err := pgxscan.Get(ctx, app, &got, queries.SQL("order-with-customer"),
+	if err := pgxscan.Get(ctx, app, &got, q.SQL("order-with-customer"),
 		pgx.NamedArgs{"customer_order_id": orderID}); err != nil {
 		t.Fatalf("order-with-customer join: %v", err)
 	}

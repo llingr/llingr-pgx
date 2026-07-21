@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 The llingr-pgx Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package lexicon
+package queries
 
 import (
 	"errors"
