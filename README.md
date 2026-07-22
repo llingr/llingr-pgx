@@ -88,29 +88,28 @@ roleUsernames := roles.NewPlaceholderBuilder().
 ```
 
 `Build()` returns a `(roles.PlaceholderUsernames, error)` pair, while `MustBuild()` panics
-on error. The result is what `schema.Migrate` takes, and carries accessors such as
-`OwnerUsername()` for wiring connection pools (see the quick start).
+on error. The returned collection is provided to `schema.Migrate`, and carries accessors such
+as `OwnerUsername()` for wiring connection pools (see the Quick Start example).
 
-Placeholder injection is prevented by requiring plain SQL identifiers: `^[A-Za-z_][A-Za-z0-9_]*$`
-(SQL identifiers can't start with a digit, max 63 characters).
+Placeholder injection is prevented by requiring plain SQL identifiers: `^[A-Za-z_][A-Za-z0-9_]*$`.
 
 
 ## Migrations
 
-Migration SQL files are read from an embedded `fs.FS` and run using the supplied
-[pgx](https://github.com/jackc/pgx) connection pool.
+The database schema is described using SQL files. These are read from an embedded `fs.FS`. Database
+connectivity is via [pgx](https://github.com/jackc/pgx) connection capability.
 
-Privileges are granted in the migrations rather than at provisioning: migrations
-typically include statements such as `GRANT SELECT, INSERT, UPDATE ON orders TO :"app"`
-with role placeholders substituted at runtime (hard-coded usernames are not recommended).
+Migrations typically include statements such as `GRANT SELECT, INSERT, UPDATE ON orders TO :"app"`
+with role placeholders substituted at runtime (hard-coded usernames are not recommended). This
+gives developers full control over all aspects of a database schema and (through the files themselves)
+complete visibility of roles vs access levels.
 
 Complete transaction control is left to the developer, allowing for `CREATE INDEX CONCURRENTLY`
 and other non-transactional features. For regular DDL changes use `BEGIN TRANSACTION;` and
 `COMMIT TRANSACTION;` to make changes atomic.
 
 Migrations follow [golang-migrate](https://github.com/golang-migrate/migrate)'s `NNN_name.up.sql`
-convention and are forward-only: `.down.sql` rollbacks are dangerous so are not directly provided
-in this library.
+convention and are forward-only: to mitigate risks, `.down.sql` rollbacks are not directly supported.
 
 ```go
 //go:embed *.sql
@@ -140,9 +139,13 @@ if err != nil {
 
 ## SQL Fragments
 
-The `queries` package is for named SQL statements: write ordinary statements in `.sql`
-files, mark each with a `-- name:` comment, and look them up by name at runtime. This
-avoids ORM and builders: the SQL in the file is exactly what is sent to the server.
+The `queries` package provides a store for explicitly crafted, 'named' SQL statements,
+which provide explicit control and clarity over the SQL sent to a database, and avoids
+the complexity associated with ORM tools and query builders. The `-- name:` marker is
+the yesql convention, as used by [dotsql](https://github.com/qustavo/dotsql) and similar.
+
+The [pgx](https://github.com/jackc/pgx) client provides a really useful `NamedArgs` capability
+which makes writing and debugging queries significantly easier - the example below shows this:
 
 ```sql
 -- name: insert-customer
@@ -176,52 +179,35 @@ _, err = pool.Exec(ctx, q.SQL("insert-customer"), pgx.NamedArgs{
 })
 ```
 
-Rules are enforced at `Load`, not at query time:
-
-* `Load` walks the whole `fs.FS`, sub-directories included, matching the `.sql` suffix
-  case-insensitively
-* A duplicate name (across files or within one file) is an error
-* An empty body is an error, which makes `SQL(name)` unambiguous: `""` always means
-  "not defined"
-* A unit test that `Load`s your embedded files turns all of these mistakes into CI
-  rather than production failures
-
-The `-- name:` marker is the yesql convention, as used by
-[dotsql](https://github.com/qustavo/dotsql) and friends. Named parameters (`@customer_id`)
-are pgx's `NamedArgs`; pair with [scany](https://github.com/georgysavva/scany) to scan
-rows into structs.
-
 For more complete examples (insert, join, struct binding) see:
 
 - `tests/queries/orders.sql`
 - `tests/queries_integration_test.go`
 
 
-## Building a Connection String
+## Connection Strings
 
-The `connect` package opens a `*pgxpool.Pool` and pings it, so a bad address or an
-unreachable server surfaces at connect time rather than on the first query. When you
-already hold a connection string there are three entry points:
+The `connect` package opens a `*pgxpool.Pool` and tests the connection with a ping.
+This needs a connection string which can be supplied in a number of ways:
 
 - `Connect(ctx, connString)` accepts either a `postgres://` URL or a libpq
-  keyword/value string and lets pgx detect which it is
-- `ConnectEnv(ctx)` reads the pool entirely from the libpq environment variables
+  keyword/value string
+- `ConnectEnv(ctx)` reads from environment variables
   (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGSSLMODE`, `PGSERVICE`,
   and the rest that `psql` honours)
-- `ConnectConfig(ctx, config)` takes a `*pgxpool.Config` you have already built
+- `ConnectConfig(ctx, config)` uses `*pgxpool.Config`
 
 
-When you would rather assemble the connection than hold a string, `ConnectionBuilder`
-provides a good selection of discoverable settings, exposes more advanced settings
-through helpers (e.g. PgBouncer, see below) and allows direct key/value access for
-all scenarios.
+The `ConnectionBuilder` provides a fluent API to create connection strings in code,
+and provides a good selection of discoverable settings. More advanced settings are
+exposed through helpers (e.g. PgBouncer, see below), and direct key/value bindings.
 
 ```go
 b := connect.NewConnectionBuilder().
     WithHost("db.example.com").
     WithPort(5432).
     WithUser("app_readwrite").
-    WithPassword(rdsPassword). // '/', '+', '=' ... special characters are ok
+    WithPassword(rdsPassword). // special characters are supported
     WithDatabase("appdb").
     WithSSLMode("require").
     WithMaxConns(10).
@@ -233,11 +219,10 @@ uri := b.PSQL()   // postgres://app_readwrite:...@db.example.com:5432/appdb?sslm
 pool, err := b.ConnectDSN(ctx)   // or ConnectPSQL(ctx), or Connect(ctx)
 ```
 
-Both renderings map to pgx `pool_*` parameters, so the same builder provides
-an equivalent pool whichever style you connect with. `DSN()` and `PSQL()` return
-the string without opening anything, while `ConnectDSN` and `ConnectPSQL` generate
-a connection string and open the connection; plain `Connect` is an alias for the DSN 
-form - safer default for AWS RDS.
+The builder provides an equivalent connection pool whichever style is used to connect. 
+`DSN()` and `PSQL()` return the string without opening anything, while `ConnectDSN`
+and `ConnectPSQL` generate a connection string and open the connection; plain `Connect`
+is an alias for the DSN form.
 
 The DSN single-quotes values whereas the PSQL URL must percent-encode them, and while
 both are handled correctly, the DSN format is generally more intuitive to work with.
@@ -261,9 +246,9 @@ Further settings in `builder_advanced.go`:
   prepared-statement support, covered under
   [Serverless and scale-to-zero](#serverless-and-scale-to-zero).
 
-Anything that is a Go function rather than a string value cannot be expressed in a
-connection string. For those cases `WithConfigHook` exposes the `*pgxpool.Config`
-before a pool opens:
+
+`WithConfigHook` exposes `*pgxpool.Config` which allows for custom behaviour;
+the hook runs at connect time and does not affect `DSN()` or `PSQL()`.
 
 ```go
 // example AWS RDS IAM auth: create a fresh token per connection
@@ -280,21 +265,20 @@ b.WithConfigHook(func(c *pgxpool.Config) error {
 })
 ```
 
-The hook runs at connect time and does not affect `DSN()` or `PSQL()`. It is also where
-you set `ConnConfig.AfterConnect` to register `pgvector` or PostGIS types and run `SET`
-statements, `ConnConfig.TLSConfig` to supply a CA held in memory rather than on disk, or
-`ConnConfig.Tracer` for OpenTelemetry. Unix-socket hosts, given as an absolute path,
+The `ConnConfig.AfterConnect` callback is useful for registering `pgvector` or PostGIS
+types, and to run `SET` statements, `ConnConfig.TLSConfig` to supply a CA held in memory rather
+than on disk, or `ConnConfig.Tracer` for OpenTelemetry. Unix-socket hosts, given as an absolute path,
 work in both approaches and are mapped to `host=` query parameters in the URL form.
 
 
 ## Serverless and Scale-to-Zero
 
-Serverless Postgres such as Neon, Supabase, or Aurora Serverless v2 adds two wrinkles:
-compute that suspends when idle, and client traffic usually arrives through a transaction
-pooler. Three rules cover this:
+Serverless Postgres such as Neon, Supabase, or Aurora Serverless v2 has two further
+wrinkles: compute that suspends when idle, and client traffic arriving through a
+transaction pooler. Advice for handling this is set out below.
 
-Keep the pool from holding the compute awake. Leave `MinConns` and `MinIdleConns` at
-their `0` default so the pool never reopens a connection merely to maintain a floor, and
+Keep the pool from holding connections open indefinitely: leave `MinConns` and `MinIdleConns`
+at their `0` default so the pool never reopens a connection just to maintain a floor, and
 set `WithMaxConnIdleTime` below the provider's suspend window so idle connections are
 released before the compute sleeps; Neon's default suspend is five minutes, which makes
 three to four minutes a safe idle time.
@@ -305,13 +289,13 @@ against concurrent migrators, and that lock is unreliable through a transaction 
 which may route successive statements to different backends. With Neon this is simply
 the difference between the plain host and the `-pooler` host.
 
-Match the query protocol to the pooler. pgx prepares and caches named server-side
+Match the query protocol to the pooler; pgx prepares and caches named server-side
 statements by default, and a pooler without prepared-statement support (stock PgBouncer
 in transaction mode, or AWS RDS Proxy) will then throw intermittent
 `prepared statement "..." already exists` errors under load.
 `WithPgBouncerCompatibility()` switches pgx to exec mode and disables the caches for
-exactly that case. You do not need it on Neon or Supabase, whose poolers replay prepared
-statements per client.
+exactly this situation. You do not need it on Neon or Supabase, whose poolers replay
+prepared statements per client.
 
 A representative Neon setup migrates on the direct endpoint and serves on the pooled one:
 
@@ -343,8 +327,8 @@ on port 6543 in transaction mode for application traffic and on 5432 in session 
 which is where migrations should run so the advisory lock holds. AWS RDS Proxy pins a
 session as soon as a prepared statement is used, which defeats pooling, so pair it with
 `WithPgBouncerCompatibility()` and run migrations against the cluster writer endpoint
-rather than the proxy; for Aurora or RDS IAM authentication, mint the token per
-connection through `WithConfigHook` as shown above.
+rather than the proxy; for Aurora or RDS IAM authentication, create tokens - per
+connection - using `WithConfigHook` as shown above.
 
 ---
 Development companion for [llingr-demux](https://github.com/llingr/llingr-demux), the
