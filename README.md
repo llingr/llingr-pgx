@@ -140,9 +140,9 @@ if err != nil {
 
 ## SQL Fragments
 
-The `lexicon` package keeps SQL as SQL: write ordinary statements in `.sql` files, mark
-each with a `-- name:` comment, and look them up by name at runtime. No ORM and no query
-builder - the SQL in the file is exactly what is sent to the server.
+The `queries` package is for named SQL statements: write ordinary statements in `.sql`
+files, mark each with a `-- name:` comment, and look them up by name at runtime. This
+avoids ORM and builders: the SQL in the file is exactly what is sent to the server.
 
 ```sql
 -- name: insert-customer
@@ -164,12 +164,12 @@ WHERE  o.customer_order_id = @customer_order_id;
 //go:embed queries/*.sql
 var queryFS embed.FS
 
-queries, err := lexicon.Load(queryFS) // load and validate once at startup
+q, err := queries.Load(queryFS) // load and validate once at startup
 if err != nil {
     log.Fatal(err)
 }
 
-_, err = pool.Exec(ctx, queries.SQL("insert-customer"), pgx.NamedArgs{
+_, err = pool.Exec(ctx, q.SQL("insert-customer"), pgx.NamedArgs{
     "customer_id": customerId,
     "email":       "grace@example.com",
     "full_name":   "Grace Hopper",
@@ -194,7 +194,7 @@ rows into structs.
 For more complete examples (insert, join, struct binding) see:
 
 - `tests/queries/orders.sql`
-- `tests/lexicon_integration_test.go`
+- `tests/queries_integration_test.go`
 
 
 ## Building a Connection String

@@ -37,14 +37,14 @@ type orderJoin struct {
 	OrderStatus   string    `db:"order_status"`
 }
 
-// TestLexicon_InsertAndJoinWithNamedParams drives the queries package end to end
+// TestQueries_InsertAndJoinWithNamedParams drives the queries package end to end
 // against real Postgres. It loads named SQL fragments from embedded .sql files,
 // inserts a customer and an order, then reads them back through an explicit
 // JOIN ... ON. Primary-key UUIDs are generated in Go (google/uuid) and bound as
 // named parameters, so the inserts need no gen_random_uuid() or RETURNING. Every
 // statement uses pgx named parameters (@name), and the joined row is scanned
 // straight into a struct by scany.
-func TestLexicon_InsertAndJoinWithNamedParams(t *testing.T) {
+func TestQueries_InsertAndJoinWithNamedParams(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testcontainers integration test in -short mode")
 	}
