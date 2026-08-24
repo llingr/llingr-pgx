@@ -56,12 +56,12 @@ func TestLoad_ParsesNamedBlocks(t *testing.T) {
 	}
 	// single line
 	wantSQL(t, set, "all-users", "SELECT id, name FROM users;")
-	// multi-line body keeps internal newlines, trimmed at the edges
-	wantSQL(t, set, "user-by-id", "SELECT id, name\nFROM users\nWHERE id = $1;")
+	// a multi-line body arrives as one line
+	wantSQL(t, set, "user-by-id", "SELECT id, name FROM users WHERE id = $1;")
 }
 
-func TestLoad_InlineCommentsStayInBody(t *testing.T) {
-	// A `--` comment that is not a `name:` marker is ordinary SQL and is kept.
+func TestLoad_InlineCommentsAreStrippedFromTheBody(t *testing.T) {
+	// A `--` comment that is not a `name:` marker is stripped with the rest.
 	set := mustLoad(t, fstest.MapFS{
 		"q.sql": file(
 			"-- name: counted\n",
@@ -69,7 +69,24 @@ func TestLoad_InlineCommentsStayInBody(t *testing.T) {
 			"SELECT count(*) FROM t WHERE active;\n",
 		),
 	})
-	wantSQL(t, set, "counted", "-- count active rows\nSELECT count(*) FROM t WHERE active;")
+	wantSQL(t, set, "counted", "SELECT count(*) FROM t WHERE active;")
+}
+
+// A body that is only commentary strips to nothing, and fails at load rather
+// than at the first execution.
+func TestLoad_ACommentOnlyBodyIsRejected(t *testing.T) {
+	_, err := Load(fstest.MapFS{
+		"q.sql": file(
+			"-- name: nothing\n",
+			"-- just a note, no SQL\n",
+		),
+	})
+	if err == nil {
+		t.Fatal("a comment-only body loaded, want an error")
+	}
+	if !strings.Contains(err.Error(), "no SQL body") {
+		t.Fatalf("error %v, want it to name the empty body", err)
+	}
 }
 
 func TestSQL(t *testing.T) {
@@ -164,7 +181,7 @@ func TestParse_CRLF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if got["a"] != "SELECT 1;\nSELECT 2;" {
+	if got["a"] != "SELECT 1; SELECT 2;" {
 		t.Errorf("CRLF body = %q", got["a"])
 	}
 }

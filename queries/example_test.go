@@ -27,7 +27,5 @@ func ExampleLoad() {
 	fmt.Println(q.SQL("user-by-email"))
 	// Output:
 	// [all-users user-by-email]
-	// SELECT user_id, full_name
-	// FROM   users
-	// WHERE  email = @email;
+	// SELECT user_id, full_name FROM users WHERE email = @email;
 }

@@ -6,6 +6,8 @@
 // no query builder: queries are ordinary SQL as text, marked with
 // `-- name: <identity>`
 //
+// Comments are stripped at load and whitespace collapsed.
+//
 // A .sql file is a sequence of named blocks:
 //
 //	-- name: all-users
@@ -101,7 +103,7 @@ func parse(content string) (map[string]string, error) {
 		if name == "" {
 			return nil
 		}
-		sql := strings.TrimSpace(strings.Join(body, "\n"))
+		sql := stripComments(strings.Join(body, "\n"))
 		if sql == "" {
 			return fmt.Errorf("query %q has no SQL body", name)
 		}
