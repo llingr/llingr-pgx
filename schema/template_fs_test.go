@@ -35,7 +35,7 @@ func newTemplatingFS() templatingFS {
 }
 
 // Open on a file substitutes placeholders and returns a memoryFile whose FileInfo
-// reports the substituted content. Covers memoryFile.Read/Stat/Close and every
+// reports the substituted content. Covers memoryFile.Read/Stat/Stop and every
 // memoryFileInfo method.
 func TestTemplatingFS_OpenSubstitutesAndExposesFileInfo(t *testing.T) {
 	tfs := newTemplatingFS()
