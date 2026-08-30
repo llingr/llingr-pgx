@@ -29,8 +29,9 @@ func (b *ConnectionBuilder) ConnectPSQL(ctx context.Context) (*pgxpool.Pool, err
 }
 
 // connect validates the config, parses the rendered connection string, applies the
-// WithConfigHook (if any), and opens the pool. It is the single path ConnectDSN and
-// ConnectPSQL share, so validation and the hook run identically whichever style opens.
+// WithConfigHook (if any), and opens the pool, pinging it unless WithoutPing is set.
+// It is the single path ConnectDSN and ConnectPSQL share, so validation and the hook
+// run identically whichever style opens.
 func (b *ConnectionBuilder) connect(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 	if err := b.validate(); err != nil {
 		return nil, err
@@ -40,11 +41,21 @@ func (b *ConnectionBuilder) connect(ctx context.Context, connString string) (*pg
 		return nil, fmt.Errorf("parse connection: %w", err)
 	}
 	if b.configHook != nil {
-		if err := b.configHook(config); err != nil {
+		if err = b.configHook(config); err != nil {
 			return nil, fmt.Errorf("config hook: %w", err)
 		}
 	}
-	return ConnectConfig(ctx, config)
+
+	pool, errP := openPool(ctx, config)
+	if errP != nil {
+		return nil, errP
+	}
+	if !b.skipPing {
+		if err = pingPool(ctx, pool); err != nil {
+			return nil, err
+		}
+	}
+	return pool, nil
 }
 
 // validate SSL mode, channel binding, WithParam keys, and WithParam/dedicated-setter collisions

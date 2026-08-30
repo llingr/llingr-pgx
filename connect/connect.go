@@ -36,9 +36,22 @@ func ConnectEnv(ctx context.Context) (*pgxpool.Pool, error) {
 	return connectString(ctx, "")
 }
 
-// ConnectConfig opens a pool from pre-built *pgxpool.Config
-// This is the single create-and-ping path every connector uses.
+// ConnectConfig opens a pool from a pre-built *pgxpool.Config and pings it.
 func ConnectConfig(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
+	pool, err := openPool(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	if err = pingPool(ctx, pool); err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+// openPool builds the pool. When minConns is zero, pgx does not open a
+// connection until the first acquire; above zero, pgx fills the pool in
+// a background goroutine.
+func openPool(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
 	if config == nil {
 		return nil, fmt.Errorf("nil pool config")
 	}
@@ -46,11 +59,16 @@ func ConnectConfig(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, 
 	if err != nil {
 		return nil, fmt.Errorf("open pool: %w", err)
 	}
-	if err = pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("ping: %w", err)
-	}
 	return pool, nil
+}
+
+// pingPool confirms the connection can run statements. The pool is closed on failure.
+func pingPool(ctx context.Context, pool *pgxpool.Pool) error {
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return fmt.Errorf("ping: %w", err)
+	}
+	return nil
 }
 
 // connectString parses any connection string pgx understands

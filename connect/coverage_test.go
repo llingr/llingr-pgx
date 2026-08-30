@@ -151,7 +151,8 @@ func TestBuilderConnect_ErrorPaths(t *testing.T) {
 		t.Error("ConnectPSQL should surface validate error")
 	}
 
-	// No sslmode set: validate() passes, so these reach the render-and-open path.
+	// No sslmode set: validate() passes, so these reach the render-and-open path,
+	// where the default ping meets the cancelled context.
 	valid := NewConnectionBuilder().
 		WithHost("127.0.0.1").WithPort(5432).WithUser("u").WithDatabase("db")
 	if _, err := valid.Connect(cancelledContext()); err == nil {
@@ -163,6 +164,27 @@ func TestBuilderConnect_ErrorPaths(t *testing.T) {
 	if _, err := valid.ConnectPSQL(cancelledContext()); err == nil {
 		t.Error("ConnectPSQL should error on cancelled context")
 	}
+}
+
+// WithoutPing decides whether opening reaches the server at all. The default pings,
+// so a cancelled context fails at connect time. WithoutPing leaves the pool lazy: at
+// minConns 0 pgx opens no connection until the first acquire, so the same cancelled
+// context yields a usable pool.
+func TestBuilderWithoutPingIsLazy(t *testing.T) {
+	reachable := func() *ConnectionBuilder {
+		return NewConnectionBuilder().
+			WithHost("127.0.0.1").WithPort(5432).WithUser("u").WithDatabase("db")
+	}
+
+	if _, err := reachable().Connect(cancelledContext()); err == nil {
+		t.Error("the default ping should surface the connect-time failure")
+	}
+
+	pool, err := reachable().WithoutPing().Connect(cancelledContext())
+	if err != nil {
+		t.Fatalf("WithoutPing should not contact the server: %v", err)
+	}
+	pool.Close()
 }
 
 // A nil pool config is rejected before any connection is attempted.
