@@ -48,6 +48,7 @@ type ConnectionBuilder struct {
 	maxConnLifetimeJitter time.Duration
 	maxConnIdleTime       time.Duration
 	healthCheckPeriod     time.Duration
+	skipPing              bool
 
 	// configHook is the programmatic escape hatch applied to the parsed config at
 	// Connect time; see WithConfigHook in builder_advanced.go.
@@ -161,5 +162,14 @@ func (b *ConnectionBuilder) WithMaxConnIdleTime(idle time.Duration) *ConnectionB
 // (pgx pool_health_check_period).
 func (b *ConnectionBuilder) WithHealthCheckPeriod(period time.Duration) *ConnectionBuilder {
 	b.healthCheckPeriod = period
+	return b
+}
+
+// WithoutPing means the pool is lazy - connecting without network interactions: pgx
+// waits for the first acquire, so issues will only surface on the first query rather
+// than at connect time. Note that above minConns 0 pgx fills the pool from a
+// background goroutine regardless, so the pool is only truly lazy at minConns 0.
+func (b *ConnectionBuilder) WithoutPing() *ConnectionBuilder {
+	b.skipPing = true
 	return b
 }
