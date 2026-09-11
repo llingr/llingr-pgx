@@ -219,3 +219,52 @@ func TestMigrate_FailingMigrationReportsDirtyVersion(t *testing.T) {
 		t.Fatalf("error should report the dirty version.\n  want substring: %q\n  got: %v", want, err)
 	}
 }
+
+// TestMigrate_SourceFailureReportsWithoutDirtyVersion drives the other branch of
+// the same error path as TestMigrate_FailingMigrationReportsDirtyVersion. A
+// migration carrying an unknown :"name" placeholder fails when golang-migrate reads
+// it from the templating filesystem, which happens before the version is marked
+// dirty, so Migrate reports the failure with no version to name. The distinction
+// matters operationally: a dirty version needs manual intervention before the next
+// run, and this one does not.
+func TestMigrate_SourceFailureReportsWithoutDirtyVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testcontainers integration test in -short mode")
+	}
+	ctx := context.Background()
+	host, port := startProvisionedPostgres(t)
+
+	roleUsernames := roles.NewPlaceholderBuilder().
+		WithOwner(testUsername[roles.OwnerRole]).
+		MustBuild()
+
+	ownerURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		testUsername[roles.OwnerRole], testPassword, host, port, testDatabase)
+	ownerPool, err := connect.Connect(ctx, ownerURL)
+	if err != nil {
+		t.Fatalf("owner pool: %v", err)
+	}
+	defer ownerPool.Close()
+
+	// :"nosuchrole" is absent from roleUsernames, so substitution rejects it. The
+	// SQL itself is valid, proving the failure is the read and not the statement.
+	unknownPlaceholder := fstest.MapFS{
+		"001_unknown_placeholder.up.sql": &fstest.MapFile{
+			Data: []byte("BEGIN TRANSACTION;\n" +
+				"GRANT USAGE ON SCHEMA public TO :\"nosuchrole\";\n" +
+				"COMMIT TRANSACTION;\n"),
+		},
+	}
+
+	err = schema.Migrate(ctx, ownerPool, unknownPlaceholder, roleUsernames)
+	if err == nil {
+		t.Fatal("expected migrate to fail on the unknown placeholder")
+	}
+	if !strings.Contains(err.Error(), "apply migrations:") {
+		t.Fatalf("error should name the failed apply.\n  want substring: %q\n  got: %v",
+			"apply migrations:", err)
+	}
+	if strings.Contains(err.Error(), "dirty at version") {
+		t.Fatalf("no version should be reported dirty, got: %v", err)
+	}
+}

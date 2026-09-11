@@ -272,3 +272,41 @@ func TestStripCommentsHandlesAnApostropheInAComment(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+// A lone $ that is not a dollar quote leaves the scanner where it started, so the
+// text after it is still scanned for comments. Two ways in: an identifier run that
+// is not closed by a second $, and one that reaches the end of the statement.
+func TestStripCommentsLeavesAnUnclosedDollarTagAlone(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "tag not closed by a second dollar",
+			in:   "SELECT $tag -- trailing\nFROM t",
+			want: "SELECT $tag FROM t",
+		},
+		{
+			name: "tag runs to the end of the statement",
+			in:   "SELECT a -- trailing\nFROM t WHERE x = $tag",
+			want: "SELECT a FROM t WHERE x = $tag",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := stripComments(testCase.in); got != testCase.want {
+				t.Fatalf("stripComments:\n in   %q\n got  %q\n want %q", testCase.in, got, testCase.want)
+			}
+		})
+	}
+}
+
+// An opening dollar quote with no closing delimiter swallows the rest of the
+// statement, so a comment marker inside it is body text and survives. The query is
+// already broken; stripping the tail would change how it is broken.
+func TestStripCommentsKeepsAnUnterminatedDollarQuoteWhole(t *testing.T) {
+	const statement = "SELECT $$abc -- not a comment"
+	if got := stripComments(statement); got != statement {
+		t.Fatalf("stripComments:\n in   %q\n got  %q\n want %q", statement, got, statement)
+	}
+}

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/llingr/llingr-pgx/roles"
 )
 
@@ -57,5 +59,34 @@ func TestMigrate_CancelledContextFailsFast(t *testing.T) {
 	err := Migrate(ctx, nil, fstest.MapFS{}, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("want context.Canceled, got: %v", err)
+	}
+}
+
+// golang-migrate pings the database when it builds its driver, so a pool pointed
+// at nothing fails there rather than at any later step. pgxpool builds a pool
+// without dialling when MinConns is zero, which is what lets this run with no
+// server: the pool exists, and its first use is the ping.
+func TestMigrate_DriverInitFailureIsReported(t *testing.T) {
+	config, err := pgxpool.ParseConfig(
+		"postgres://u:p@127.0.0.1:1/db?sslmode=disable&connect_timeout=1")
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		t.Fatalf("new pool: %v", err)
+	}
+	defer pool.Close()
+
+	fsys := fstest.MapFS{
+		"001_x.up.sql": &fstest.MapFile{Data: []byte("SELECT 1;")},
+	}
+
+	err = Migrate(context.Background(), pool, fsys, map[roles.Placeholder]roles.Username{})
+	if err == nil {
+		t.Fatal("expected Migrate to fail against an unreachable database")
+	}
+	if !strings.Contains(err.Error(), "init migration driver") {
+		t.Fatalf("error should name the failed driver init, got: %v", err)
 	}
 }
