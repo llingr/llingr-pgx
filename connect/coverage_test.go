@@ -215,3 +215,46 @@ func TestPackageConnect_ErrorPaths(t *testing.T) {
 		t.Error("ConnectConfig should error on cancelled context")
 	}
 }
+
+// openPool reports a pool-construction failure distinctly from a connection
+// failure. pgxpool rejects a MaxConns below 1 before it dials, so zeroing it on a
+// config that ParseConfig produced drives the construction error without needing a
+// server. This is the only way into that branch: every other field ParseConfig sets
+// is already valid by construction.
+func TestOpenPool_RejectsUnusableMaxConns(t *testing.T) {
+	config, err := pgxpool.ParseConfig("postgres://u:p@127.0.0.1:5432/db?sslmode=disable")
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	config.MaxConns = 0
+
+	pool, err := openPool(context.Background(), config)
+	if err == nil {
+		pool.Close()
+		t.Fatal("expected openPool to reject a zero MaxConns")
+	}
+	if !strings.Contains(err.Error(), "open pool") {
+		t.Fatalf("error should name the failed pool open, got: %v", err)
+	}
+}
+
+// The builder returns openPool's error unwrapped, so the caller sees the pool
+// failure rather than a second layer of context. The hook runs after ParseConfig
+// and before the pool is built, which is what makes it usable to force this.
+func TestBuilderConnect_ReturnsOpenPoolError(t *testing.T) {
+	pool, err := NewConnectionBuilder().
+		WithHost("127.0.0.1").WithPort(5432).WithUser("u").WithDatabase("db").
+		WithSSLMode(SSLModeDisable).
+		WithConfigHook(func(config *pgxpool.Config) error {
+			config.MaxConns = 0
+			return nil
+		}).
+		Connect(context.Background())
+	if err == nil {
+		pool.Close()
+		t.Fatal("expected the builder to fail when the hook leaves MaxConns unusable")
+	}
+	if !strings.Contains(err.Error(), "open pool") {
+		t.Fatalf("error should name the failed pool open, got: %v", err)
+	}
+}

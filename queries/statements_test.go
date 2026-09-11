@@ -318,3 +318,20 @@ func names(m map[string]string) []string {
 	sort.Strings(out)
 	return out
 }
+
+// failingFS fails every Open, including the one fs.WalkDir performs on the root
+// to stat it. fstest.MapFS cannot produce this, so a filesystem whose reads fail
+// (a broken embed, a network mount) needs its own stub.
+type failingFS struct{ err error }
+
+func (f failingFS) Open(string) (fs.File, error) { return nil, f.err }
+
+// A walk error reaches the caller unwrapped, so the failure keeps whatever the
+// filesystem said rather than being relabelled as a parse or read failure.
+func TestLoad_WalkErrorIsReturned(t *testing.T) {
+	sentinel := errors.New("filesystem unavailable")
+
+	if _, err := Load(failingFS{err: sentinel}); !errors.Is(err, sentinel) {
+		t.Fatalf("want the filesystem's own error, got: %v", err)
+	}
+}

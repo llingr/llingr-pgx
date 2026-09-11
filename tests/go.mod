@@ -10,7 +10,7 @@ replace github.com/llingr/llingr-pgx => ../
 require (
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/llingr/llingr-pgx v0.0.0-00010101000000-000000000000
 	github.com/testcontainers/testcontainers-go v0.43.0
 )
