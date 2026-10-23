@@ -33,6 +33,36 @@ func TestMigrate_InvalidRoleUsernameIsRejected(t *testing.T) {
 	}
 }
 
+// An invalid table name is rejected before any pool use. The empty name is
+// included: golang-migrate would silently fall back to its default. The pool is
+// real but unreachable, so a missing check fails on the error text, not a panic.
+func TestMigrate_InvalidMigrationsTableIsRejected(t *testing.T) {
+	pool := unreachablePool(t)
+	fsys := fstest.MapFS{
+		"001_x.up.sql": &fstest.MapFile{Data: []byte("SELECT 1;")},
+	}
+
+	cases := []struct{ name, table string }{
+		{"empty", ""},
+		{"space", "schema migrations"},
+		{"schema qualified", "public.schema_migrations"},
+		{"injection", `x"; DROP TABLE y; --`},
+		{"over 63 bytes", strings.Repeat("t", roles.MaxIdentifierBytes+1)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Migrate(context.Background(), pool, fsys, map[roles.Placeholder]roles.Username{},
+				WithMigrationsTable(tc.table))
+			if err == nil {
+				t.Fatalf("expected Migrate to reject migrations table %q", tc.table)
+			}
+			if !strings.Contains(err.Error(), "invalid migrations table") {
+				t.Fatalf("error should name the invalid table, got: %v", err)
+			}
+		})
+	}
+}
+
 // A FilesystemDirectory that does not exist in the FS fails when the source driver
 // is opened, which happens before any pool use, so a nil pool is never dereferenced.
 func TestMigrate_BadFilesystemDirectoryIsError(t *testing.T) {
@@ -63,10 +93,27 @@ func TestMigrate_CancelledContextFailsFast(t *testing.T) {
 }
 
 // golang-migrate pings the database when it builds its driver, so a pool pointed
-// at nothing fails there rather than at any later step. pgxpool builds a pool
-// without dialling when MinConns is zero, which is what lets this run with no
-// server: the pool exists, and its first use is the ping.
+// at nothing fails there rather than at any later step.
 func TestMigrate_DriverInitFailureIsReported(t *testing.T) {
+	pool := unreachablePool(t)
+	fsys := fstest.MapFS{
+		"001_x.up.sql": &fstest.MapFile{Data: []byte("SELECT 1;")},
+	}
+
+	err := Migrate(context.Background(), pool, fsys, map[roles.Placeholder]roles.Username{})
+	if err == nil {
+		t.Fatal("expected Migrate to fail against an unreachable database")
+	}
+	if !strings.Contains(err.Error(), "init migration driver") {
+		t.Fatalf("error should name the failed driver init, got: %v", err)
+	}
+}
+
+// unreachablePool points at a closed port. pgxpool builds a pool without dialling
+// when MinConns is zero, which is what lets a test run with no server: the pool
+// exists, and its first use fails.
+func unreachablePool(t *testing.T) *pgxpool.Pool {
+	t.Helper()
 	config, err := pgxpool.ParseConfig(
 		"postgres://u:p@127.0.0.1:1/db?sslmode=disable&connect_timeout=1")
 	if err != nil {
@@ -76,17 +123,6 @@ func TestMigrate_DriverInitFailureIsReported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new pool: %v", err)
 	}
-	defer pool.Close()
-
-	fsys := fstest.MapFS{
-		"001_x.up.sql": &fstest.MapFile{Data: []byte("SELECT 1;")},
-	}
-
-	err = Migrate(context.Background(), pool, fsys, map[roles.Placeholder]roles.Username{})
-	if err == nil {
-		t.Fatal("expected Migrate to fail against an unreachable database")
-	}
-	if !strings.Contains(err.Error(), "init migration driver") {
-		t.Fatalf("error should name the failed driver init, got: %v", err)
-	}
+	t.Cleanup(pool.Close)
+	return pool
 }

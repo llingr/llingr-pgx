@@ -40,6 +40,7 @@ import (
 // an unmatched placeholder is a hard error.
 //
 // By default, migrations are read from the root of fsys; override using WithFilesystemDirectory.
+// The applied version is recorded in DefaultMigrationsTable unless WithMigrationsTable names another.
 func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames roles.PlaceholderUsernames,
 	options ...Option) (err error) {
 
@@ -55,6 +56,13 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames 
 	// and so bypass it; this guarantees validation however the map was constructed.
 	if err = roles.ValidatePlaceholderUsernames(roleUsernames); err != nil {
 		return fmt.Errorf("invalid role usernames: %w", err)
+	}
+
+	// The table name reaches CREATE TABLE, so it is validated like a username.
+	if !roles.IsPlainSQLIdentifier(resolvedOptions.MigrationsTable) {
+		return fmt.Errorf("invalid migrations table %q: not a plain SQL identifier "+
+			"(letters, digits, underscore; max %d bytes)",
+			resolvedOptions.MigrationsTable, roles.MaxIdentifierBytes)
 	}
 
 	tfs := templatingFS{
@@ -79,7 +87,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, roleUsernames 
 	// OpenDBFromPool does NOT take ownership: closing this sql.DB instance
 	// leaves the pool open for the caller to manage.
 	sqlDB := stdlib.OpenDBFromPool(pool)
-	driver, err = migratepgx.WithInstance(sqlDB, &migratepgx.Config{})
+	driver, err = migratepgx.WithInstance(sqlDB, &migratepgx.Config{
+		MigrationsTable: resolvedOptions.MigrationsTable,
+	})
 	if err != nil {
 		return fmt.Errorf("init migration driver: %w", err)
 	}

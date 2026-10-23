@@ -8,19 +8,19 @@
 [![Tag](https://img.shields.io/github/v/tag/llingr/llingr-pgx)](https://github.com/llingr/llingr-pgx/tags)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Postgres migrations with injection-safe role templating, a
-connection-string builder, and ORM-free SQL helpers:
+Bootstrapping for the excellent [pgx](https://github.com/jackc/pgx)
+client (this library's principal dependency). Includes SQL migrations with
+user/role name schema file templating, and an ORM-free SQL statements store.
 
- * Connection string builder for both key/value DSN and `postgres://` URL formats, reducing
-   boilerplate around many of the advanced capabilities provided by the excellent
-   [pgx](https://github.com/jackc/pgx) client. Mildly opinionated while leaving access
-   for bespoke setups.
+ * Connection string builder for both key/value `DSN` and `postgres://` formats,
+   with support for more advanced [pgx](https://github.com/jackc/pgx) features.
  * Embedded schema migrations using [golang-migrate](https://github.com/golang-migrate/migrate)
    which allows full control of transaction boundaries - easily `CREATE INDEX CONCURRENTLY`.
  * Migration file templating using the quoted-identifier form of psql variable interpolation:
    injection-safe runtime (per-environment) `GRANT SELECT ON orders TO :"readonly";`
  * Roles builder to map the above interpolation placeholders to real usernames.
- * SQL fragments package for ORM-free SQL statements; [scany](https://github.com/georgysavva/scany)
+ * SQL fragments package for ORM-free SQL statements;
+   [scany](https://github.com/georgysavva/scany)
    is recommended for binding structs (not bundled with this library).  
 
 ```sh
@@ -30,7 +30,7 @@ go get github.com/llingr/llingr-pgx
 For working examples see the `Example*` functions on
 [pkg.go.dev](https://pkg.go.dev/github.com/llingr/llingr-pgx) (one per package, in the
 `example_test.go` files) and the end-to-end integration tests in `tests/`, which run the
-full migrate-grant-query cycle against a real Postgres.
+full migrate-grant-query cycle against a Postgres in Docker.
 
 ## Quick Start
 
@@ -43,22 +43,25 @@ var migrationsFS embed.FS
 
 ctx := context.Background()
 
+// align usernames to placeholders in the migration files
 roleUsernames := roles.NewPlaceholderBuilder().
-    WithOwner("example_schema_owner"). // see 'Roles and Placeholders' below
-    WithApp("example_app_readwrite").
+    WithOwner("db_prod_foobar_owner").     // :"owner" in schema migration files
+    WithApp("db_prod_foobar_readwrite").   // :"app" in schema migration files
+    WithCustom("housekeeping", "db_prod_foobar_housekeeping"). // :"housekeeping" in schema migration files
     MustBuild()
 
+// build a connection pool for the owner role
 ownerPool, err := connect.NewConnectionBuilder().
-    WithHost("db.example.com").WithPort(5432).
-    WithDatabase("appdb").WithSSLMode("require").
+    WithHost("db.example.com").WithPort(5432).WithDatabase("appdb").
     WithUser(roleUsernames.OwnerUsername()).
     WithPassword(ownerPassword).
-    Connect(ctx)
+    WithSSLMode("require").Connect(ctx)
 if err != nil {
     log.Fatal(err)
 }
 defer ownerPool.Close()
 
+// run migrations as the "owner" role 
 if err := schema.Migrate(ctx, ownerPool, migrationsFS, roleUsernames); err != nil {
     log.Fatal(err)
 }

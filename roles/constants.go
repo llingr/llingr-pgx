@@ -22,10 +22,10 @@ const MaxIdentifierBytes = 63
 // plainSQLIdentifier is compiled once and reused by every check.
 var plainSQLIdentifier = regexp.MustCompile(PlainSQLIdentifierRegex)
 
-// isPlainSQLIdentifier reports whether s is a plain SQL identifier
+// IsPlainSQLIdentifier reports whether s is a plain SQL identifier
 // within Postgres's length limit, mitigating placeholder injection
 // and silent server-side truncation.
-func isPlainSQLIdentifier(s string) bool {
+func IsPlainSQLIdentifier(s string) bool {
 	if s == "" || len(s) > MaxIdentifierBytes {
 		return false
 	}

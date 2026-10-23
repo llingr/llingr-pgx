@@ -178,6 +178,88 @@ func TestMigrateAgainstProvisionedPostgres(t *testing.T) {
 	}
 }
 
+// TestMigrate_SeparateTablesKeepMigrationsApart: the application's migrations on the default
+// table at 3 and a library's on its own table at 1, neither reading the other.
+func TestMigrate_SeparateTablesKeepMigrationsApart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testcontainers integration test in -short mode")
+	}
+	ctx := context.Background()
+	host, port := startProvisionedPostgres(t)
+
+	roleUsernames := roles.NewPlaceholderBuilder().
+		WithOwner(testUsername[roles.OwnerRole]).
+		WithApp(testUsername[roles.AppRole]).
+		WithCustom(readOnlyRole, testUsername[readOnlyRole]).
+		MustBuild()
+
+	ownerURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		testUsername[roles.OwnerRole], testPassword, host, port, testDatabase)
+	ownerPool, err := connect.Connect(ctx, ownerURL)
+	if err != nil {
+		t.Fatalf("owner pool: %v", err)
+	}
+	defer ownerPool.Close()
+
+	// The application's migrations first, so the default table is at 3 before the library's run.
+	if err = schema.Migrate(ctx, ownerPool, migrations.FS, roleUsernames); err != nil {
+		t.Fatalf("migrate the application: %v", err)
+	}
+
+	const libraryTable = "library_schema_migrations"
+	libraryMigrations := fstest.MapFS{
+		"001_library_audit.up.sql": &fstest.MapFile{
+			Data: []byte("BEGIN TRANSACTION;\n" +
+				"CREATE TABLE library_audit (id BIGINT PRIMARY KEY);\n" +
+				"GRANT SELECT ON library_audit TO :\"app\";\n" +
+				"COMMIT TRANSACTION;\n"),
+		},
+	}
+	if err = schema.Migrate(ctx, ownerPool, libraryMigrations, roleUsernames,
+		schema.WithMigrationsTable(libraryTable)); err != nil {
+		t.Fatalf("migrate the library: %v", err)
+	}
+
+	appliedVersion := func(table string) int64 {
+		var version int64
+		if err := ownerPool.QueryRow(ctx, "SELECT version FROM "+table).Scan(&version); err != nil {
+			t.Fatalf("read %s: %v", table, err)
+		}
+		return version
+	}
+	if got := appliedVersion(schema.DefaultMigrationsTable); got != 3 {
+		t.Errorf("%s holds version %d, want 3 (the application's alone)",
+			schema.DefaultMigrationsTable, got)
+	}
+	if got := appliedVersion(libraryTable); got != 1 {
+		t.Errorf("%s holds version %d, want 1 (the library's alone)", libraryTable, got)
+	}
+
+	var libraryTableExists bool
+	if err = ownerPool.QueryRow(ctx,
+		"SELECT EXISTS (SELECT FROM pg_tables WHERE tablename = 'library_audit')").Scan(&libraryTableExists); err != nil {
+		t.Fatalf("look up library_audit: %v", err)
+	}
+	if !libraryTableExists {
+		t.Error("the library's migration did not run")
+	}
+
+	// Second pass is a no-op for both.
+	if err = schema.Migrate(ctx, ownerPool, migrations.FS, roleUsernames); err != nil {
+		t.Fatalf("re-migrate the application: %v", err)
+	}
+	if err = schema.Migrate(ctx, ownerPool, libraryMigrations, roleUsernames,
+		schema.WithMigrationsTable(libraryTable)); err != nil {
+		t.Fatalf("re-migrate the library: %v", err)
+	}
+	if got := appliedVersion(schema.DefaultMigrationsTable); got != 3 {
+		t.Errorf("after the second pass %s holds version %d, want 3", schema.DefaultMigrationsTable, got)
+	}
+	if got := appliedVersion(libraryTable); got != 1 {
+		t.Errorf("after the second pass %s holds version %d, want 1", libraryTable, got)
+	}
+}
+
 // TestMigrate_FailingMigrationReportsDirtyVersion drives the dirty-version branch of
 // schema.Migrate: a migration that fails mid-run leaves golang-migrate's version
 // marked dirty, and Migrate should surface that, naming the version it stopped at.

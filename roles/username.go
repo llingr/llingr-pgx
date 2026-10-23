@@ -16,7 +16,7 @@ func (u Username) String() string {
 }
 
 func (u Username) Validate() error {
-	if !isPlainSQLIdentifier(u.String()) {
+	if !IsPlainSQLIdentifier(u.String()) {
 		const invalidUsernameError = "username %q is not a valid SQL identifier (letters, digits, underscore; max 63 bytes)"
 		return fmt.Errorf(invalidUsernameError, u)
 	}
