@@ -19,7 +19,7 @@ func (p Placeholder) String() string {
 }
 
 func (p Placeholder) Validate() error {
-	if !isPlainSQLIdentifier(p.String()) {
+	if !IsPlainSQLIdentifier(p.String()) {
 		const invalidRoleError = "role %q is not a valid SQL identifier (letters, digits, underscore; max 63 bytes)"
 		return fmt.Errorf(invalidRoleError, p)
 	}
