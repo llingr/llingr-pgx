@@ -3,7 +3,9 @@
 
 // Package connect opens pgx connection pools to Postgres, each verified with a ping
 // so a bad address or unreachable server fails at connect time rather than on first
-// query.
+// query. Every pool returns timestamptz values, and their arrays, ranges and multiranges,
+// in UTC rather than the process's local time zone; a config's own AfterConnect runs after
+// that, so it can register other locations.
 //
 // Two layers:
 //
@@ -48,13 +50,14 @@ func ConnectConfig(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, 
 	return pool, nil
 }
 
-// openPool builds the pool. When minConns is zero, pgx does not open a
-// connection until the first acquire; above zero, pgx fills the pool in
-// a background goroutine.
+// openPool builds the pool, each connection returning timestamptz in UTC. When minConns is
+// zero, pgx does not open a connection until the first acquire; above zero, pgx fills the
+// pool in a background goroutine.
 func openPool(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
 	if config == nil {
 		return nil, fmt.Errorf("nil pool config")
 	}
+	scanTimesInUTC(config)
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("open pool: %w", err)

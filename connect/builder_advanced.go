@@ -121,9 +121,11 @@ func (b *ConnectionBuilder) WithPgBouncerCompatibility() *ConnectionBuilder {
 // Use it for the function-valued pgx settings the string form cannot reach:
 //
 //   - Dynamic credentials (AWS RDS / Aurora IAM, GCP Cloud SQL IAM, Azure AD): set
-//     ConnConfig.BeforeConnect to mint a fresh auth token per connection.
+//     BeforeConnect to mint a fresh auth token per connection.
 //   - Per-connection setup and custom types (pgvector, PostGIS, enums): set
-//     ConnConfig.AfterConnect to run SET statements or register types.
+//     AfterConnect, which receives the *pgx.Conn and its type map, to run SET statements
+//     or register types. It runs after the pool's own registration of timestamptz in UTC,
+//     so it can replace that too.
 //   - In-memory TLS (a CA loaded from a secret manager, not a file): set
 //     ConnConfig.TLSConfig.
 //   - Observability: set ConnConfig.Tracer to a pgx QueryTracer (e.g. OpenTelemetry).
