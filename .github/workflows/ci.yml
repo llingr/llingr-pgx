@@ -7,29 +7,37 @@ permissions:
   contents: read
 
 env:
-  # Both modules (root library and tests/) declare go 1.25.0 with no toolchain
-  # bump, so a single version covers every job. govulncheck needs Go >= 1.25.
-  GO_VERSION: '1.25'
+  # Both modules (root library and tests/) declare go 1.26.0, the oldest supported Go
+  # release, with no toolchain bump, so a single version covers every job.
+  GO_VERSION: '1.26'
 
 jobs:
   build:
     name: build & vet
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - run: go build ./...
       - run: go vet ./...
+      - name: go.mod and go.sum are tidy, in both modules
+        run: make tidy
 
   test:
     name: test (race + coverage)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -42,7 +50,7 @@ jobs:
       # Skipped under nektos/act (which sets env.ACT=true): Codecov needs a real
       # GitHub OIDC token / CODECOV_TOKEN that only exists on GitHub-hosted runners.
       # Runs normally in GitHub Actions.
-      - uses: codecov/codecov-action@v7
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: ${{ !env.ACT }}
         with:
           files: coverage.out

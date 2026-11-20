@@ -10,7 +10,7 @@ else
 endif
 
 # Pinned to the same version the CI lint job uses (.github/workflows/ci.yml)
-GOLANGCI_LINT_VERSION := v2.12.2
+GOLANGCI_LINT_VERSION := v2.15.0
 
 COVDIR := $(CURDIR)/.coverage
 
@@ -48,7 +48,7 @@ coverage:
 lint:
 	docker run --rm -v "$(PWD)":/app -w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint run ./...
 
-# Fails if either module's go.mod/go.sum is untidy (CI does not check this).
+# Fails if either module's go.mod/go.sum is untidy; CI runs it in the build job.
 tidy:
 	go mod tidy -diff
 	cd tests && go mod tidy -diff
