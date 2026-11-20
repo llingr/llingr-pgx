@@ -9,6 +9,11 @@ name: Release build
 
 on:
   workflow_call:
+    inputs:
+      tag:
+        description: the version tag to build
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,34 +22,40 @@ jobs:
   build:
     name: build & attest
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write
       attestations: write
+    env:
+      TAG: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
+      # the tag, not the ref the run started from, which is main when Auto Tag calls the release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # cyclonedx-gomod v1.10+ requires Go >= 1.25
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
           go-version: '1.26'
           cache: false
 
       - name: Source archive
         run: >
           git archive --format=tar.gz
-          --prefix="llingr-pgx-${GITHUB_REF_NAME}/"
-          -o "llingr-pgx_${GITHUB_REF_NAME}.tar.gz"
-          "${GITHUB_REF_NAME}"
+          --prefix="llingr-pgx-${TAG}/"
+          -o "llingr-pgx_${TAG}.tar.gz"
+          HEAD
 
       - name: Generate CycloneDX SBOM (cyclonedx-gomod)
         run: >
-          go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.10.0
           mod -licenses -type library -json
-          -output "llingr-pgx_${GITHUB_REF_NAME}.cdx.json"
+          -output "llingr-pgx_${TAG}.cdx.json"
 
       - name: Install syft
-        uses: anchore/sbom-action/download-syft@v0
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
 
       - name: Generate SPDX SBOM (syft)
         # tests/ is a separate module carrying test-harness deps
@@ -54,25 +65,31 @@ jobs:
           --exclude './.github/**'
           --exclude './tests/**'
           --source-name llingr-pgx
-          --source-version "${GITHUB_REF_NAME}"
+          --source-version "${TAG}"
           --source-supplier "Llingr Software Ltd"
-          -o "spdx-json=llingr-pgx_${GITHUB_REF_NAME}.spdx.json"
+          -o "spdx-json=llingr-pgx_${TAG}.spdx.json"
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v4
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: llingr-pgx_${{ github.ref_name }}.tar.gz
+          subject-path: llingr-pgx_${{ inputs.tag }}.tar.gz
+
+      # the attestation lives in GitHub's store; the bundle beside the tarball
+      # makes the provenance verifiable offline too
+      - name: Attach provenance bundle
+        run: cp "${{ steps.attest.outputs.bundle-path }}" "llingr-pgx_${TAG}.tar.gz.sigstore"
 
       - name: Attest SBOM
-        uses: actions/attest-sbom@v4
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
-          subject-path: llingr-pgx_${{ github.ref_name }}.tar.gz
-          sbom-path: llingr-pgx_${{ github.ref_name }}.cdx.json
+          subject-path: llingr-pgx_${{ inputs.tag }}.tar.gz
+          sbom-path: llingr-pgx_${{ inputs.tag }}.cdx.json
 
       - name: Upload release assets
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets
-          path: llingr-pgx_${{ github.ref_name }}.*
+          path: llingr-pgx_${{ inputs.tag }}.*
           if-no-files-found: error
           retention-days: 1
