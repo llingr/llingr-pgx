@@ -200,6 +200,16 @@ This needs a connection string which can be supplied in a number of ways:
   and the rest that `psql` honours)
 - `ConnectConfig(ctx, config)` uses `*pgxpool.Config`
 
+### Times in UTC
+
+Every pool returns `timestamptz` values in UTC. pgx would otherwise return them in the time
+zone of the process reading them: the instant is the same, but a `time.Time` carries its
+location, so a time read on a server in New York formats as `08:52-05:00` where the same
+moment written in UTC formats as `13:52Z`. The pool registers UTC for `timestamptz` and for
+every type pgx builds on it: `timestamptz[]`, `tstzrange`, `tstzrange[]`, `tstzmultirange`,
+and `tstzmultirange[]`, which pgx does not otherwise register at all. A pool config's own
+`AfterConnect` runs after that registration, so it can register another location.
+
 
 The `ConnectionBuilder` provides a fluent API to create connection strings in code,
 and provides a good selection of discoverable settings. More advanced settings are
@@ -268,10 +278,11 @@ b.WithConfigHook(func(c *pgxpool.Config) error {
 })
 ```
 
-The `ConnConfig.AfterConnect` callback is useful for registering `pgvector` or PostGIS
-types, and to run `SET` statements, `ConnConfig.TLSConfig` to supply a CA held in memory rather
-than on disk, or `ConnConfig.Tracer` for OpenTelemetry. Unix-socket hosts, given as an absolute path,
-work in both approaches and are mapped to `host=` query parameters in the URL form.
+The `AfterConnect` callback on `*pgxpool.Config`, which receives the `*pgx.Conn` and its type
+map, registers `pgvector` or PostGIS types and runs `SET` statements; it runs after the pool's
+registration of UTC times. `ConnConfig.TLSConfig` supplies a CA held in memory rather than on
+disk, and `ConnConfig.Tracer` sets up OpenTelemetry. Unix-socket hosts, given as an absolute
+path, work in both approaches and are mapped to `host=` query parameters in the URL form.
 
 
 ## Serverless and Scale-to-Zero
